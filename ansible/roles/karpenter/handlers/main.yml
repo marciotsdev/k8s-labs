@@ -1,0 +1,6 @@
+---
+- name: restart coredns
+  command: k3s kubectl -n kube-system rollout restart deploy/coredns
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  become: true

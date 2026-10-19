@@ -1,0 +1,138 @@
+---
+# ATENCAO - integracao experimental (ver docs/karpenter-ministack.md):
+# Karpenter fala com a API EC2/IAM da AWS pra provisionar nos reais. Aqui ele
+# e apontado pro MiniStack (emulador local), mesma ideia ja usada pelo
+# Crossplane. A diferenca: o Crossplane tem um campo proprio (endpoint.source:
+# Custom) na sua ProviderConfig; o Karpenter nao tem um equivalente
+# documentado, entao usamos a variavel padrao do AWS SDK v2 (AWS_ENDPOINT_URL)
+# no processo do controller. E o mecanismo correto pela documentacao do SDK,
+# mas nao e algo que o chart do Karpenter testa oficialmente — validar na
+# pratica. E esperado que as chamadas de API cheguem no MiniStack; NAO e
+# esperado que o "node" criado vire um kubelet de verdade (ver docs/).
+
+- name: Label every node with a (single) zone
+  # O chart do Karpenter traz um topologySpreadConstraint sobre
+  # topology.kubernetes.io/zone por padrao - sem o label em pelo menos um
+  # valor, o scheduler recusa com "node(s) didn't match pod topology spread
+  # constraints (missing required label)". k3s puro nao seta esse label
+  # (so clusters em nuvem real tem zona) - aqui todos os nos ficam na mesma
+  # zona fake (unico host Proxmox mesmo).
+  command: >
+    k3s kubectl label node {{ item }} topology.kubernetes.io/zone=lab-pve --overwrite
+  loop: "{{ groups['k8s_labs'] }}"
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  become: true
+  changed_when: "'labeled' in label_result.stdout"
+  register: label_result
+
+- name: Apply the MiniStack CoreDNS wildcard override (mesmo padrao do Crossplane)
+  copy:
+    dest: /tmp/coredns-custom.yaml
+    content: |
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: coredns-custom
+        namespace: kube-system
+      data:
+        ministack.server: |
+          {{ ministack_domain }}:53 {
+              template IN A {
+                  answer "{{ '{{' }} .Name {{ '}}' }} 60 IN A {{ ministack_ip }}"
+              }
+          }
+    mode: "0644"
+  become: true
+
+- name: Apply the CoreDNS ConfigMap
+  command: k3s kubectl apply -f /tmp/coredns-custom.yaml
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  become: true
+  register: coredns_apply
+  changed_when: "'unchanged' not in coredns_apply.stdout"
+  notify: restart coredns
+
+- meta: flush_handlers
+
+- name: Install aws-cli (bootstrap do IAM fake no MiniStack)
+  apt:
+    name: awscli
+    state: present
+  become: true
+
+- name: Bootstrap fake IAM role + instance profile for Karpenter
+  # Usa o IP direto (nao o nome ministack.homelab): esse comando roda no SO
+  # da VM via SSH/become, que resolve DNS pelo /etc/resolv.conf normal da
+  # rede, nao pelo CoreDNS do cluster — o wildcard aplicado acima so vale
+  # pra DNS visto de DENTRO dos pods. IAM (ao contrario do S3) nao prefixa
+  # o hostname, entao o IP puro funciona sem problema aqui.
+  environment:
+    AWS_ACCESS_KEY_ID: test
+    AWS_SECRET_ACCESS_KEY: test
+    AWS_DEFAULT_REGION: us-east-1
+  shell: |
+    set -e
+    EP="http://{{ ministack_ip }}:4566"
+    aws --endpoint-url "$EP" iam get-role --role-name {{ karpenter_node_role }} >/dev/null 2>&1 || \
+      aws --endpoint-url "$EP" iam create-role --role-name {{ karpenter_node_role }} \
+        --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
+    aws --endpoint-url "$EP" iam get-instance-profile --instance-profile-name {{ karpenter_node_role }} >/dev/null 2>&1 || \
+      aws --endpoint-url "$EP" iam create-instance-profile --instance-profile-name {{ karpenter_node_role }}
+    aws --endpoint-url "$EP" iam add-role-to-instance-profile --instance-profile-name {{ karpenter_node_role }} --role-name {{ karpenter_node_role }} 2>/dev/null || true
+  args:
+    executable: /bin/bash
+  become: true
+  register: iam_bootstrap
+  changed_when: "'create-role' in iam_bootstrap.stdout"
+
+- name: Install Karpenter (apontado pro MiniStack)
+  command: >
+    /usr/local/bin/helm upgrade --install karpenter
+    oci://public.ecr.aws/karpenter/karpenter
+    --version {{ karpenter_version }}
+    -n {{ karpenter_namespace }} --create-namespace
+    --set settings.clusterName={{ karpenter_cluster_name }}
+    --set settings.clusterEndpoint=https://{{ ansible_host }}:6443
+    --set settings.isolatedVPC=true
+    --set-string controller.env[0].name=AWS_ENDPOINT_URL
+    --set-string controller.env[0].value={{ ministack_endpoint }}
+    --set-string controller.env[1].name=AWS_ACCESS_KEY_ID
+    --set-string controller.env[1].value=test
+    --set-string controller.env[2].name=AWS_SECRET_ACCESS_KEY
+    --set-string controller.env[2].value=test
+    --set-string controller.env[3].name=AWS_REGION
+    --set-string controller.env[3].value=us-east-1
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  become: true
+  register: karpenter_install
+  changed_when: "'STATUS: deployed' in karpenter_install.stdout"
+
+# Achado real (ver docs/karpenter-ministack.md): o controller faz panic()
+# no boot, antes de qualquer NodeClaim - ele chama DescribeInstanceTypeOfferings
+# incondicionalmente (operator.go) e a edicao "light" do MiniStack responde
+# "InvalidAction: Unknown EC2 action". settings.isolatedVPC=true (pensado pra
+# VPC sem saida de internet) nao pula essa chamada - testado e confirmado.
+# Sem isso o deployment fica em CrashLoopBackOff pra sempre; escala a 0 pra
+# nao poluir os logs. Os CRDs (NodePool/EC2NodeClass/NodeClaim) continuam
+# instalados e inspecionaveis.
+- name: Scale the Karpenter controller to 0 (ver nota acima - nao sobe contra o MiniStack)
+  command: k3s kubectl -n {{ karpenter_namespace }} scale deploy/karpenter --replicas=0
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  become: true
+  changed_when: true
+
+- name: Show Karpenter CRDs installed
+  command: k3s kubectl get crd -o name
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  become: true
+  changed_when: false
+  register: karpenter_crds
+
+- name: Display Karpenter CRDs
+  debug:
+    msg: "{{ karpenter_crds.stdout_lines | select('search', 'karpenter') | list }}"

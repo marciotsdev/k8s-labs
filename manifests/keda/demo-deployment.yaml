@@ -1,0 +1,28 @@
+# Deployment alvo pros ScaledObjects de exemplo (cron e cpu). Imagem leve de
+# proposito (nginx) - o que importa aqui e observar o HPA que o KEDA cria,
+# nao a carga real da aplicacao.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keda-demo
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keda-demo
+  template:
+    metadata:
+      labels:
+        app: keda-demo
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi

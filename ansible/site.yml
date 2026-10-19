@@ -1,0 +1,11 @@
+---
+# Ordem importa: o cluster precisa existir (e o server precisa estar com
+# kubeconfig + helm prontos) antes de instalar KEDA/Karpenter nele.
+- hosts: k8s_labs
+  roles:
+    - k3s-cluster
+
+- hosts: k8s_labs_server
+  roles:
+    - keda
+    - karpenter

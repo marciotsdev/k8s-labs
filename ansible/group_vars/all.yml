@@ -1,0 +1,17 @@
+k8s_labs_hosts:
+  k8s-labs-cp: 192.168.15.67
+  k8s-labs-w1: 192.168.15.68
+  k8s-labs-w2: 192.168.15.69
+
+secrets_dir: "{{ playbook_dir }}/../secrets"
+
+# MiniStack (emulador AWS, VM 2007 em homelab-iac) — mesmo endpoint usado
+# pelo Crossplane em homelab-gitops. O nome (nao o IP) importa: clientes AWS
+# que prefixam o hostname (ex.: S3 Control) quebram com IP puro - por isso
+# cada cluster que fala com o MiniStack precisa do proprio CoreDNS curinga
+# (ver manifests/karpenter/coredns-custom.yaml, mesmo padrao do Crossplane).
+ministack_ip: "192.168.15.56"
+ministack_domain: "ministack.homelab"
+ministack_endpoint: "http://ministack.homelab:4566"
+
+kubeconfig: "/home/{{ ansible_user }}/.kube/config"

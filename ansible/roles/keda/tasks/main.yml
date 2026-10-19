@@ -1,0 +1,36 @@
+---
+# KEDA e cluster-agnostic (so precisa de metrics-server/HPA padrao) — ao
+# contrario do Karpenter, nao depende de nenhuma API de nuvem.
+#
+# metrics-server NAO e instalado aqui: o k3s ja traz o seu proprio (addon
+# nativo, gerenciado via Deploy/Addon CRD, nao Helm) habilitado por padrao
+# em kube-system. Uma segunda instalacao via Helm colide (ServiceAccount
+# "metrics-server" ja existe, sem os labels que o Helm exige).
+
+- name: Add the kedacore helm repo
+  command: /usr/local/bin/helm repo add kedacore https://kedacore.github.io/charts
+  become: true
+  register: helm_repo_add
+  changed_when: "'already exists' not in helm_repo_add.stderr"
+
+- name: Update helm repos
+  command: /usr/local/bin/helm repo update
+  become: true
+  changed_when: false
+
+- name: Install KEDA
+  command: >
+    /usr/local/bin/helm upgrade --install keda kedacore/keda
+    -n keda --create-namespace
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  become: true
+  register: keda_install
+  changed_when: "'STATUS: deployed' in keda_install.stdout"
+
+- name: Wait for the KEDA operator to become Ready
+  command: k3s kubectl -n keda rollout status deploy/keda-operator --timeout=120s
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  become: true
+  changed_when: false

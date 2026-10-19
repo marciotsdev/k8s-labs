@@ -1,0 +1,17 @@
+# Segredos — nunca commitar
+secrets/
+
+# Terraform
+terraform/**/.terraform/
+terraform/**/terraform.tfstate
+terraform/**/terraform.tfstate.backup
+terraform/**/terraform.tfstate.*.backup
+terraform/**/*.tfplan
+terraform/**/crash.log
+
+# Ansible
+*.retry
+
+# kubeconfig coletado do cluster
+kubeconfig/
+*.kubeconfig

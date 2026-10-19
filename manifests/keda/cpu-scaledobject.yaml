@@ -1,0 +1,19 @@
+# Scaler baseado em CPU (via metrics-server/HPA, instalado pelo role keda).
+# Pra testar: gere carga no pod (ex.: kubectl exec -it <pod> -- sh -c
+# "yes > /dev/null") e observe o HPA subir replicas.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: demo-cpu-scaler
+  namespace: default
+spec:
+  scaleTargetRef:
+    name: keda-demo
+  minReplicaCount: 1
+  maxReplicaCount: 5
+  cooldownPeriod: 60
+  triggers:
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "50"

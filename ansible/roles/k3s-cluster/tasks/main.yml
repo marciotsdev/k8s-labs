@@ -1,0 +1,151 @@
+---
+# Cluster multi-no de proposito (1 server + N agents), ao contrario do role
+# k3s single-node do homelab-gitops — aqui o objetivo e ter onde Karpenter/
+# KEDA escalarem de verdade e cenarios de scheduling/drain pra praticar.
+
+- name: Read the shared cluster join token
+  set_fact:
+    k3s_token: "{{ lookup('file', k3s_token_file) }}"
+  no_log: true
+
+# VM recem-clonada ainda roda o apt-get do proprio cloud-init no primeiro
+# boot (update/upgrade de pacotes) - sem esperar, a primeira task de apt do
+# Ansible colide com ele no lock do dpkg (E: Could not get lock
+# /var/lib/dpkg/lock-frontend).
+- name: Wait for cloud-init to finish its first-boot run
+  command: cloud-init status --wait
+  become: true
+  changed_when: false
+
+- name: Install the QEMU guest agent
+  apt:
+    name: qemu-guest-agent
+    state: present
+    update_cache: true
+  become: true
+
+- name: Check for the guest agent virtio port
+  stat:
+    path: /dev/virtio-ports/org.qemu.guest_agent.0
+  register: qga_port
+
+- name: Ensure the guest agent is enabled and running
+  systemd:
+    name: qemu-guest-agent
+    enabled: true
+    state: started
+  become: true
+  when: qga_port.stat.exists
+
+- name: Ensure the k3s config directory exists
+  file:
+    path: /etc/rancher/k3s
+    state: directory
+    mode: "0755"
+  become: true
+
+- name: Install k3s server
+  when: k3s_role == 'server'
+  shell: |
+    curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL={{ k3s_channel }} \
+      K3S_TOKEN={{ k3s_token }} \
+      INSTALL_K3S_EXEC="server {{ k3s_server_exec_args }}" sh -
+  args:
+    creates: /usr/local/bin/k3s
+  become: true
+  no_log: true
+
+- name: Wait for the server API to answer
+  when: k3s_role == 'server'
+  command: k3s kubectl get nodes --no-headers
+  become: true
+  register: k3s_server_check
+  until: k3s_server_check.rc == 0
+  retries: 30
+  delay: 10
+  changed_when: false
+
+- name: Install k3s agent (join the server)
+  when: k3s_role == 'agent'
+  shell: |
+    curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL={{ k3s_channel }} \
+      K3S_URL=https://{{ hostvars[groups['k8s_labs_server'][0]].ansible_host }}:6443 \
+      K3S_TOKEN={{ k3s_token }} sh -
+  args:
+    creates: /usr/local/bin/k3s
+  become: true
+  no_log: true
+
+# Nome do servico difere entre server e agent (o instalador do k3s cria
+# "k3s" num e "k3s-agent" no outro) - o script ja habilita e inicia o
+# servico por padrao; esta task so confirma/corrige caso tenha ficado parado.
+- name: Ensure k3s is enabled and running
+  systemd:
+    name: "{{ 'k3s' if k3s_role == 'server' else 'k3s-agent' }}"
+    enabled: true
+    state: started
+  become: true
+
+- name: Wait for every node to join and go Ready (checked from the server)
+  when: k3s_role == 'server'
+  shell: "set -o pipefail; k3s kubectl get nodes --no-headers | grep -c ' Ready'"
+  args:
+    executable: /bin/bash
+  become: true
+  register: ready_count
+  until: ready_count.rc == 0 and ready_count.stdout | int == groups['k8s_labs'] | length
+  retries: 30
+  delay: 15
+  changed_when: false
+
+- name: Create ~/.kube (server)
+  when: k3s_role == 'server'
+  file:
+    path: "/home/{{ ansible_user }}/.kube"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0700"
+  become: true
+
+- name: Copy the kubeconfig for the login user
+  when: k3s_role == 'server'
+  copy:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: "/home/{{ ansible_user }}/.kube/config"
+    remote_src: true
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0600"
+  become: true
+
+- name: Point the kubeconfig at the node address (usavel de fora da VM)
+  when: k3s_role == 'server'
+  replace:
+    path: "/home/{{ ansible_user }}/.kube/config"
+    regexp: 'https://127\.0\.0\.1:6443'
+    replace: "https://{{ ansible_host }}:6443"
+  become: true
+
+- name: Install helm
+  when: k3s_role == 'server'
+  unarchive:
+    src: "https://get.helm.sh/helm-{{ helm_version }}-linux-amd64.tar.gz"
+    dest: /tmp
+    remote_src: true
+    creates: /tmp/linux-amd64/helm
+  become: true
+
+- name: Put helm on the PATH
+  when: k3s_role == 'server'
+  copy:
+    src: /tmp/linux-amd64/helm
+    dest: /usr/local/bin/helm
+    remote_src: true
+    mode: "0755"
+  become: true
+
+- name: Show the cluster that came up
+  when: k3s_role == 'server'
+  debug:
+    msg: "Cluster k8s-labs pronto — server em {{ ansible_host }}:6443, {{ groups['k8s_labs'] | length }} nos no total."

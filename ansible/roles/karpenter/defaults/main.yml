@@ -1,0 +1,12 @@
+# K8s 1.36 (versao instalada pelo k3s "stable" neste lab) exige Karpenter
+# >= 1.13 - versoes anteriores fazem panic() no boot ("karpenter version is
+# not compatible with K8s version"). Checar releases novos em
+# github.com/aws/karpenter-provider-aws/releases antes de trocar.
+karpenter_version: "1.15.0"
+karpenter_namespace: karpenter
+karpenter_cluster_name: k8s-labs
+# Nome do "role" IAM falso que o Karpenter espera encontrar via IAM
+# (GetInstanceProfile) antes de aceitar um EC2NodeClass. MiniStack nao valida
+# credenciais, mas a chamada em si precisa ter uma resposta — por isso o
+# bootstrap cria esse role/instance-profile antes de instalar o Karpenter.
+karpenter_node_role: KarpenterNodeRole-k8s-labs

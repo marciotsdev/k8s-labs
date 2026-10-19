@@ -1,0 +1,21 @@
+# Cenario 2: memory limit abaixo do que o container realmente usa.
+# Sintoma esperado: CrashLoopBackOff com OOMKilled (kubectl describe pod ->
+# Last State: Terminated, Reason: OOMKilled). Pratique: kubectl top pod,
+# kubectl describe pod, ajustar requests/limits e observar a recuperacao.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: scenario-2-resource-limits
+resources:
+  - ../../base
+  - namespace.yaml
+patches:
+  - target:
+      kind: Deployment
+      name: playground
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 4Mi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 2Mi

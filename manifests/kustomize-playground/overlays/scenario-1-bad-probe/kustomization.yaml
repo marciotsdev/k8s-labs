@@ -1,0 +1,17 @@
+# Cenario 1: readinessProbe aponta pra porta errada (8080 em vez de 80).
+# Sintoma esperado: pods ficam Running mas 0/1 Ready, Service sem endpoints.
+# Pratique: kubectl describe pod, kubectl get endpoints, kubectl logs.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: scenario-1-bad-probe
+resources:
+  - ../../base
+  - namespace.yaml
+patches:
+  - target:
+      kind: Deployment
+      name: playground
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/readinessProbe/httpGet/port
+        value: 8080

@@ -1,0 +1,27 @@
+# Exemplo mais simples de KEDA: escala por horario, sem depender de nenhuma
+# fonte externa de metricas. Bom primeiro teste pra confirmar que o operator
+# esta reagindo antes de tentar um scaler mais complexo (ex.: SQS do MiniStack).
+#
+# kubectl apply -f manifests/keda/demo-deployment.yaml   (deployment alvo)
+# kubectl apply -f manifests/keda/cron-scaledobject.yaml
+# kubectl get hpa,scaledobject -w
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: demo-cron-scaler
+  namespace: default
+spec:
+  scaleTargetRef:
+    name: keda-demo
+  minReplicaCount: 1
+  maxReplicaCount: 5
+  cooldownPeriod: 60
+  triggers:
+    - type: cron
+      metadata:
+        timezone: America/Sao_Paulo
+        # Ajuste start/end pra uma janela proxima (minuto atual +1/+3) na hora
+        # do teste — cron scaler so dispara dentro da janela definida.
+        start: 0 * * * *
+        end: 1 * * * *
+        desiredReplicas: "5"

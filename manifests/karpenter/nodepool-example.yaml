@@ -1,0 +1,43 @@
+# Passo manual (de proposito - nao e aplicado pelo Ansible). So tem valor de
+# estudo de schema/CRD por ora: o controller do Karpenter (ver role karpenter
+# e docs/karpenter-ministack.md) esta escalado a 0 porque faz panic() no
+# proprio boot contra o MiniStack (DescribeInstanceTypeOfferings nao existe
+# na edicao community) - mesmo aplicando isto, nenhum NodeClaim vai ser
+# processado, porque nao ha controller rodando pra ve-lo. Util pra:
+# `kubectl explain nodepool`, `kubectl explain ec2nodeclass`, e pra ver a
+# validacao do schema (`kubectl apply --dry-run=server -f este-arquivo`).
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: default
+spec:
+  role: KarpenterNodeRole-k8s-labs
+  amiSelectorTerms:
+    - alias: al2023@latest
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: k8s-labs
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: k8s-labs
+---
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: default
+spec:
+  template:
+    spec:
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: default
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand"]
+  limits:
+    cpu: "4"
