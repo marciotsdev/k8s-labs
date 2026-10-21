@@ -1,0 +1,18 @@
+# Pod de teste so pra forcar o Karpenter a agir: pede MAIS CPU do que a
+# capacidade TOTAL de qualquer um dos 3 nodes existentes (2 vCPU = 2000m
+# cada) - 1800m cabia com folga sobrando, por isso nao disparou da primeira
+# vez. 2500m e maior que o teto de qualquer node atual, garantindo que o
+# scheduler nunca encaixa ali, nao importa o quao ocioso esteja.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: karpenter-trigger
+  namespace: default
+spec:
+  containers:
+    - name: pause
+      image: registry.k8s.io/pause:3.9
+      resources:
+        requests:
+          cpu: "2500m"
+          memory: 256Mi

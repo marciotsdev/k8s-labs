@@ -1,0 +1,26 @@
+# Primeira validacao: metadataOptions.type=none (sem cloud-init customizado
+# ainda) - a VM e criada de verdade no Proxmox, mas NAO entra no cluster k3s
+# (o join do k3s precisa de K3S_URL/K3S_TOKEN via cloud-init proprio, nao do
+# "bootstrap token" generico que esse provider injeta, pensado pra kubeadm).
+# Proximo passo, depois de validar a criacao: trocar pra metadataOptions.type:
+# cdrom com um cloud-init customizado que instala e junta o agent k3s.
+apiVersion: karpenter.proxmox.sinextra.dev/v1alpha1
+kind: ProxmoxNodeClass
+metadata:
+  name: default
+spec:
+  region: pve
+  instanceTemplateRef:
+    kind: ProxmoxUnmanagedTemplate
+    name: default
+  # O template 9000 vive no storage local-lvm (confirmado via `qm config
+  # 9000`) - sem isso explicito, o CRD assume um default que nao bate com
+  # onde o template realmente esta, e o matching falha com "TemplatesNotFound".
+  bootDevice:
+    size: 30Gi
+    storage: local-lvm
+  metadataOptions:
+    type: none
+  tags:
+    - karpenter
+    - k8s-labs

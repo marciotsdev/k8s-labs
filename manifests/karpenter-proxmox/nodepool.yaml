@@ -1,0 +1,20 @@
+# Limits baixos de proposito - e so o primeiro teste de criacao de VM, nao
+# queremos o Karpenter tentando subir varias VMs grandes sem supervisao.
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: default
+spec:
+  limits:
+    cpu: "4"
+    memory: 8Gi
+  template:
+    spec:
+      nodeClassRef:
+        group: karpenter.proxmox.sinextra.dev
+        kind: ProxmoxNodeClass
+        name: default
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]

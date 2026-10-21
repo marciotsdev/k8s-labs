@@ -1,5 +1,10 @@
 # Karpenter contra o MiniStack — resultado real do teste
 
+> **Abordagem abandonada em favor do [provider Proxmox](karpenter-proxmox.md)**, que funciona de
+> verdade (provisiona VMs reais no lab). Este documento fica como registro do achado real — o
+> provider **AWS** do Karpenter não consegue nem inicializar contra o MiniStack — não como guia a
+> seguir.
+
 Karpenter não é um autoscaler genérico: ele fala diretamente com a API EC2 de
 um provedor de nuvem para criar/destruir instâncias reais. Neste homelab não
 existe nuvem real — a aposta foi apontá-lo para o **MiniStack** (emulador AWS

@@ -40,13 +40,18 @@ server.
 
 - **KEDA**: cluster-agnostic, sem nenhuma dependência de nuvem. Exemplos em
   `manifests/keda/` (scaler por cron e por CPU).
-- **Karpenter**: apontado para o MiniStack (emulador AWS já usado pelo
-  Crossplane) via `AWS_ENDPOINT_URL`. Testado e documentado em
-  [docs/karpenter-ministack.md](docs/karpenter-ministack.md) — o controller
-  não chega a subir (`panic` em `DescribeInstanceTypeOfferings`, action que o
-  MiniStack community não implementa). Fica instalado com 0 réplicas só
-  pelos CRDs (`NodePool`/`EC2NodeClass`/`NodeClaim`), disponíveis pra estudo
-  da API mesmo sem autoscaling funcional.
+- **Karpenter**: **provisionamento real validado**, via o provider
+  [sergelogvinov/karpenter-provider-proxmox](https://github.com/sergelogvinov/karpenter-provider-proxmox)
+  (fala direto com a API do Proxmox, não AWS/MiniStack). Documentado em
+  [docs/karpenter-proxmox.md](docs/karpenter-proxmox.md) — o Karpenter já
+  criou e desprovisionou uma VM real no lab, escolhendo o tamanho sozinho.
+  Falta só o cloud-init customizado pra VM entrar de fato no cluster k3s
+  (ver "limitação atual" no doc). A primeira tentativa (apontar o provider
+  **AWS** do Karpenter pro MiniStack) ficou documentada à parte em
+  [docs/karpenter-ministack.md](docs/karpenter-ministack.md) como achado real
+  — o controller nem chega a subir (`panic` em
+  `DescribeInstanceTypeOfferings`) — mas foi abandonada em favor do provider
+  Proxmox.
 - **Kustomize**: playground de troubleshooting em
   `manifests/kustomize-playground/` — uma base saudável e overlays que
   quebram de propósito (probe na porta errada, memory limit baixo demais),

@@ -1,0 +1,23 @@
+# Provider real (ao contrario da tentativa com AWS/MiniStack, ver
+# docs/karpenter-ministack.md) - Karpenter provisionando VMs de verdade no
+# Proxmox do lab. Credencial NAO vai aqui: existingConfigSecret aponta pro
+# secret ja criado via `kubectl -n kube-system create secret generic
+# karpenter-provider-proxmox --from-file=config.yaml=...` (token em
+# secrets/karpenter_proxmox_token_id e secrets/karpenter_proxmox_token_secret,
+# nunca commitados).
+existingConfigSecret: karpenter-provider-proxmox
+existingConfigSecretKey: config.yaml
+
+# CRDs (ProxmoxUnmanagedTemplate/ProxmoxNodeClass/NodePool) aplicados a parte
+# como manifests proprios (mesmo padrao usado pro Karpenter-AWS) - mais facil
+# de inspecionar/reaplicar um de cada vez, em vez de embutir no values do Helm.
+customResources:
+  nodeClass:
+    default:
+      enabled: false
+  nodePools:
+    default:
+      enabled: false
+  nodeTemplate:
+    default:
+      enabled: false

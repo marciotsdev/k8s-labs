@@ -1,0 +1,10 @@
+# Aponta pro template que ja existe no Proxmox (9000, ubuntu-2204-template),
+# em vez de deixar o Karpenter baixar/gerenciar uma imagem propria
+# (ProxmoxTemplate faria isso). O controller procura esse nome em todos os
+# nos do cluster Proxmox.
+apiVersion: karpenter.proxmox.sinextra.dev/v1alpha1
+kind: ProxmoxUnmanagedTemplate
+metadata:
+  name: default
+spec:
+  templateName: ubuntu-2204-template

@@ -15,7 +15,12 @@ vms = {
     memory      = 4096
     disk        = 30
     tags        = ["lab", "k8s", "env-labs"]
-    dns_servers = ["192.168.15.65", "192.168.15.1"]
+    # Habilitado em 2026-10-21: o guest agent ja e instalado/iniciado pela
+    # role k3s-cluster, mas o systemd so consegue ativar o servico se o canal
+    # virtio existir na VM (agent=1 no Proxmox) - sem isso, "dependency job
+    # failed" ao tentar systemctl start (o device nunca existe).
+    agent_enabled = true
+    dns_servers   = ["192.168.15.65", "192.168.15.1"]
     ssh_keys = [
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBO3BiGOxRN29Jfas+UGS0hV+JGKZedAl+IMpzwrzLs8 homelab-terraform-ansible",
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBogEzcV72H1vVmvC849JTMTFYguxVw5QKl4JX85fRj0 thundercat@windows-claude",
@@ -23,13 +28,14 @@ vms = {
     ]
   }
   k8s-labs-w1 = {
-    vm_id       = 2019
-    ip          = "192.168.15.68/24"
-    cores       = 2
-    memory      = 4096
-    disk        = 30
-    tags        = ["lab", "k8s", "env-labs"]
-    dns_servers = ["192.168.15.65", "192.168.15.1"]
+    vm_id         = 2019
+    ip            = "192.168.15.68/24"
+    cores         = 2
+    memory        = 4096
+    disk          = 30
+    tags          = ["lab", "k8s", "env-labs"]
+    agent_enabled = true
+    dns_servers   = ["192.168.15.65", "192.168.15.1"]
     ssh_keys = [
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBO3BiGOxRN29Jfas+UGS0hV+JGKZedAl+IMpzwrzLs8 homelab-terraform-ansible",
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBogEzcV72H1vVmvC849JTMTFYguxVw5QKl4JX85fRj0 thundercat@windows-claude",
@@ -37,13 +43,14 @@ vms = {
     ]
   }
   k8s-labs-w2 = {
-    vm_id       = 2020
-    ip          = "192.168.15.69/24"
-    cores       = 2
-    memory      = 4096
-    disk        = 30
-    tags        = ["lab", "k8s", "env-labs"]
-    dns_servers = ["192.168.15.65", "192.168.15.1"]
+    vm_id         = 2020
+    ip            = "192.168.15.69/24"
+    cores         = 2
+    memory        = 4096
+    disk          = 30
+    tags          = ["lab", "k8s", "env-labs"]
+    agent_enabled = true
+    dns_servers   = ["192.168.15.65", "192.168.15.1"]
     ssh_keys = [
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBO3BiGOxRN29Jfas+UGS0hV+JGKZedAl+IMpzwrzLs8 homelab-terraform-ansible",
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBogEzcV72H1vVmvC849JTMTFYguxVw5QKl4JX85fRj0 thundercat@windows-claude",
