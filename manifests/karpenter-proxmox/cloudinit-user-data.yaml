@@ -1,0 +1,39 @@
+#cloud-config
+# Template de cloud-init (nao-sensivel, por isso comitado) - o Karpenter
+# preenche os campos Metadata e Values na hora de criar cada VM (ver
+# docs/nodeclass.md do provider pra lista completa de campos acessiveis).
+# ATENCAO #1: "#cloud-config" PRECISA ser a primeira linha do arquivo - e
+# assim que o cloud-init reconhece o formato do documento. Comentarios antes
+# dessa linha fazem ele ignorar o arquivo inteiro (silenciosamente - nao da
+# erro nenhum, so nunca aplica nada do user-data). Foi exatamente isso que
+# quebrou a primeira tentativa com SSH: a VM bootava, o hostname aparecia
+# (via um mecanismo separado do Proxmox, SMBIOS), mas o runcmd nunca rodava.
+# ATENCAO #2: o arquivo inteiro e processado como Go template, ate dentro de
+# comentarios - evitar escrever a sintaxe de chaves-duplas aqui em cima
+# (fora das linhas de verdade abaixo), mesmo como exemplo explicativo. Foi
+# isso que quebrou as duas tentativas anteriores a essa.
+# Diferente do default do provider (pensado pra kubeadm), este roda o
+# instalador do k3s em modo AGENT - e assim que o k3s se junta a um cluster
+# (K3S_URL+K3S_TOKEN), nao via bootstrap token generico de kubeadm.
+hostname: {{ .Metadata.Hostname }}
+manage_etc_hosts: true
+package_update: true
+packages:
+  - qemu-guest-agent
+
+# Mesmo padrao de chave SSH usado no resto do lab (ver terraform.tfvars) -
+# sem isso, uma VM que falhe no runcmd fica sem NENHUM jeito de diagnosticar
+# (sem senha de console, sem guest agent, sem SSH).
+users:
+  - name: ubuntu
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: [users]
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBO3BiGOxRN29Jfas+UGS0hV+JGKZedAl+IMpzwrzLs8 homelab-terraform-ansible
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBogEzcV72H1vVmvC849JTMTFYguxVw5QKl4JX85fRj0 thundercat@windows-claude
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJJbotLXtaqwLd2a8vYRCOO3YbpMgIuMevYKhz9NoHJ4 root@pve
+
+runcmd:
+  - [ systemctl, enable, --now, qemu-guest-agent.service ]
+  - [ sh, -c, 'curl -sfL https://get.k3s.io | K3S_URL={{ get .Values "K3sUrl" }} K3S_TOKEN={{ get .Values "K3sToken" }} sh - >> /var/log/k3s-join.log 2>&1' ]

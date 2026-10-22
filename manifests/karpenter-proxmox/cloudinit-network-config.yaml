@@ -1,0 +1,15 @@
+# network-config customizado (formato v1, mesmo que o provider documenta
+# suportar). O default do provider usa "name: eth0" fixo - nossas VMs
+# clonadas desse template ficam com a interface chamada "ens18" (confirmado
+# via qm guest cmd network-get-interfaces), entao o DHCP do default nunca
+# encontra a interface certa: a VM sobe com IPv6 automatico (nao depende de
+# cloud-init) mas sem IPv4 nenhum. Nao da pra usar os campos Metadata/Values
+# aqui pro nome real da interface - nao existe esse dado disponivel nesses
+# objetos - entao fixamos "ens18" (comportamento reproduzido de forma
+# consistente nas VMs criadas a partir deste template especifico).
+version: 1
+config:
+  - type: physical
+    name: ens18
+    subnets:
+      - type: dhcp

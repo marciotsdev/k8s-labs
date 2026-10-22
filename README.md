@@ -40,14 +40,17 @@ server.
 
 - **KEDA**: cluster-agnostic, sem nenhuma dependência de nuvem. Exemplos em
   `manifests/keda/` (scaler por cron e por CPU).
-- **Karpenter**: **provisionamento real validado**, via o provider
+- **Karpenter**: **provisionamento real validado, ponta a ponta**, via o
+  provider
   [sergelogvinov/karpenter-provider-proxmox](https://github.com/sergelogvinov/karpenter-provider-proxmox)
   (fala direto com a API do Proxmox, não AWS/MiniStack). Documentado em
-  [docs/karpenter-proxmox.md](docs/karpenter-proxmox.md) — o Karpenter já
-  criou e desprovisionou uma VM real no lab, escolhendo o tamanho sozinho.
-  Falta só o cloud-init customizado pra VM entrar de fato no cluster k3s
-  (ver "limitação atual" no doc). A primeira tentativa (apontar o provider
-  **AWS** do Karpenter pro MiniStack) ficou documentada à parte em
+  [docs/karpenter-proxmox.md](docs/karpenter-proxmox.md) — o Karpenter cria
+  uma VM real no Proxmox, escolhe o tamanho sozinho, o cloud-init customizado
+  instala e junta o k3s como agent, e **o node aparece `Ready` no
+  `kubectl get nodes`** e roda workload de verdade. Desprovisionamento também
+  valida (VM removida do Proxmox sozinha; só o objeto `Node` do Kubernetes
+  precisa de limpeza manual, ver doc). A primeira tentativa (apontar o
+  provider **AWS** do Karpenter pro MiniStack) ficou documentada à parte em
   [docs/karpenter-ministack.md](docs/karpenter-ministack.md) como achado real
   — o controller nem chega a subir (`panic` em
   `DescribeInstanceTypeOfferings`) — mas foi abandonada em favor do provider

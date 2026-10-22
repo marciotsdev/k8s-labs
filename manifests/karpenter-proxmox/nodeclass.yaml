@@ -1,9 +1,8 @@
-# Primeira validacao: metadataOptions.type=none (sem cloud-init customizado
-# ainda) - a VM e criada de verdade no Proxmox, mas NAO entra no cluster k3s
-# (o join do k3s precisa de K3S_URL/K3S_TOKEN via cloud-init proprio, nao do
-# "bootstrap token" generico que esse provider injeta, pensado pra kubeadm).
-# Proximo passo, depois de validar a criacao: trocar pra metadataOptions.type:
-# cdrom com um cloud-init customizado que instala e junta o agent k3s.
+# Fase 2: metadataOptions.type=cdrom, com cloud-init customizado proprio pro
+# k3s (ver manifests/karpenter-proxmox/cloudinit-user-data.yaml e
+# docs/karpenter-proxmox.md). templatesRef = o template (nao-sensivel,
+# comitado); valuesRef = os valores reais (K3sUrl/K3sToken, secret separado,
+# nunca comitado).
 apiVersion: karpenter.proxmox.sinextra.dev/v1alpha1
 kind: ProxmoxNodeClass
 metadata:
@@ -20,7 +19,13 @@ spec:
     size: 30Gi
     storage: local-lvm
   metadataOptions:
-    type: none
+    type: cdrom
+    templatesRef:
+      name: k3s-cloudinit-templates
+      namespace: kube-system
+    valuesRef:
+      name: k3s-cloudinit-values
+      namespace: kube-system
   tags:
     - karpenter
     - k8s-labs
