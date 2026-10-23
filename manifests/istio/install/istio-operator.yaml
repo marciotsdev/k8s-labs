@@ -1,0 +1,41 @@
+# Instalacao do Istio 1.31.3 no k8s-labs (modo sidecar).
+#   istioctl install -f manifests/istio/install/istio-operator.yaml -y
+#
+# Por que assim:
+# - profile "minimal": so o istiod (control plane). Sem ingress gateway: os
+#   cenarios sao todos trafego leste-oeste (pod -> pod dentro do mesh), e um
+#   gateway LoadBalancer brigaria com o Traefik do k3s pelas portas 80/443 no
+#   ServiceLB.
+# - requests reduzidos: o default do istiod pede 500m/2Gi, o que nao cabe
+#   confortavelmente em nodes de 2 vCPU. Sidecar default pede 100m/128Mi por
+#   pod; aqui 10m/40Mi, suficiente pra trafego de laboratorio.
+# - accessLogFile: access log do Envoy em stdout de cada sidecar. E a
+#   principal ferramenta dos cenarios (campo response_flags: UH, UT, URX...).
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  name: k8s-labs
+  namespace: istio-system
+spec:
+  profile: minimal
+  meshConfig:
+    accessLogFile: /dev/stdout
+  components:
+    pilot:
+      k8s:
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+  values:
+    pilot:
+      autoscaleEnabled: false
+    global:
+      proxy:
+        resources:
+          requests:
+            cpu: 10m
+            memory: 40Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi

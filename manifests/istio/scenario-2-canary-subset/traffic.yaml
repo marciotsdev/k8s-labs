@@ -1,0 +1,38 @@
+# Canary 80/20 entre httpbin v1 e v2 -- com um bug de proposito.
+#
+# Sintoma pra quem esta de fora: "o canary esta dando ~20% de 503".
+# A tentacao e culpar a v2 (rollback!). Mas a v2 esta saudavel: o problema
+# esta no roteamento. Diagnostico no guia (docs/istio.md, Cenario 2).
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: httpbin
+  namespace: istio-lab
+spec:
+  host: httpbin
+  subsets:
+    - name: v1
+      labels:
+        version: v1
+    - name: v2
+      labels:
+        version: V2   # BUG: o label real do pod e "v2" (minusculo) -> subset vazio
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: httpbin
+  namespace: istio-lab
+spec:
+  hosts:
+    - httpbin
+  http:
+    - route:
+        - destination:
+            host: httpbin
+            subset: v1
+          weight: 80
+        - destination:
+            host: httpbin
+            subset: v2
+          weight: 20

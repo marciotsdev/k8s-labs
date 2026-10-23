@@ -1,0 +1,11 @@
+# A "mudanca de seguranca" que quebra o cliente legado: o namespace istio-lab
+# passa a exigir mTLS em toda conexao de entrada. O sidecar do httpbin rejeita
+# qualquer conexao que nao venha de outro sidecar (sem certificado SPIFFE).
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: istio-lab
+spec:
+  mtls:
+    mode: STRICT

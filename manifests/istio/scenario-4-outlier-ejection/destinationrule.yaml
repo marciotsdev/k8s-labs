@@ -1,0 +1,21 @@
+# Circuit breaker (outlier detection) agressivo demais.
+#
+# A ideia de quem escreveu: "tirar do pool rapido qualquer pod com problema".
+# O que acontece de verdade: um 500 de NEGOCIO (requisicao invalida de um
+# cliente, o pod esta saudavel) ja ejeta o pod por 3 minutos. Com
+# maxEjectionPercent 100, poucas requisicoes ruins ejetam TODOS os pods, e o
+# servico inteiro passa a responder 503 pra todo mundo -- inclusive pra quem
+# so chama /get, que nunca falhou.
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: httpbin
+  namespace: istio-lab
+spec:
+  host: httpbin
+  trafficPolicy:
+    outlierDetection:
+      consecutive5xxErrors: 1   # um unico 5xx ja conta como "pod doente"
+      interval: 1s
+      baseEjectionTime: 3m
+      maxEjectionPercent: 100   # permite ejetar o pool inteiro

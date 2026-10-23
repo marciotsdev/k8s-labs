@@ -2,7 +2,7 @@
 
 IaC separada (não faz parte de `homelab-iac` nem `homelab-gitops`) para um
 cluster k3s multi-nó dedicado a praticar troubleshooting avançado e validar
-KEDA, Karpenter e Kustomize, sem misturar esse experimento com a plataforma
+KEDA, Karpenter, Kustomize e Istio, sem misturar esse experimento com a plataforma
 "de produção" do lab.
 
 ## Topologia
@@ -59,6 +59,13 @@ server.
   `manifests/kustomize-playground/` — uma base saudável e overlays que
   quebram de propósito (probe na porta errada, memory limit baixo demais),
   cada um em seu próprio namespace, para praticar diagnóstico.
+- **Istio** (1.31.3, sidecar, profile `minimal`): instalação e 4 cenários de
+  troubleshooting em `manifests/istio/` — mTLS STRICT x cliente sem sidecar,
+  canary com subset vazio (`503 UH`), retry/timeout mascarando backend doente
+  (`504 URX,UT`) e outlier detection ejetando pods saudáveis. Guia completo,
+  com saídas reais e leitura dos response flags, em
+  [docs/istio.md](docs/istio.md). Workers com 6GB de RAM (eram 4GB) por
+  causa dos sidecars.
 
 ## Convenções herdadas do resto do lab
 

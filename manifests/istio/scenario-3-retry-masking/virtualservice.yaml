@@ -1,0 +1,25 @@
+# Politica de resiliencia "generosa" que esconde problemas reais.
+#
+# Dois sintomas diferentes saem do mesmo objeto:
+#  a) /status/200:1,503:1 (backend falha 50% das vezes): o cliente ve quase
+#     100% de 200 -> dashboard do consumidor fica verde, mas o backend esta
+#     quebrando metade das requisicoes e recebendo ~2x a carga.
+#  b) /delay/1 (backend lento, 1s): perTryTimeout de 500ms corta cada
+#     tentativa antes da resposta, o retry dispara de novo, e o cliente leva
+#     ~2s pra receber um 504 -- de uma chamada que teria funcionado em 1s.
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: httpbin
+  namespace: istio-lab
+spec:
+  hosts:
+    - httpbin
+  http:
+    - route:
+        - destination:
+            host: httpbin
+      retries:
+        attempts: 3
+        perTryTimeout: 500ms
+        retryOn: 5xx,reset,connect-failure

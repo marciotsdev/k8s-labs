@@ -1,0 +1,134 @@
+# App base do lab de Istio: httpbin em duas versoes (v1 com 2 replicas, v2
+# com 1) atras de um unico Service, mais um cliente curl. Tudo com sidecar.
+#
+# go-httpbin (mesma imagem dos samples oficiais do Istio) tem os endpoints que
+# os cenarios precisam:
+#   /hostname          -> nome do pod que respondeu (USE_REAL_HOSTNAME=true)
+#   /delay/N           -> responde depois de N segundos
+#   /status/200:1,503:1 -> 200 ou 503 sorteado com peso (falha intermitente)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: istio-lab
+  labels:
+    istio-injection: enabled
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: httpbin
+  namespace: istio-lab
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: httpbin
+  namespace: istio-lab
+  labels:
+    app: httpbin
+spec:
+  selector:
+    app: httpbin
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: httpbin-v1
+  namespace: istio-lab
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: httpbin
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: httpbin
+        version: v1
+    spec:
+      serviceAccountName: httpbin
+      containers:
+        - name: httpbin
+          image: docker.io/mccutchen/go-httpbin:v2.15.0
+          env:
+            - name: USE_REAL_HOSTNAME
+              value: "true"
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: httpbin-v2
+  namespace: istio-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: httpbin
+      version: v2
+  template:
+    metadata:
+      labels:
+        app: httpbin
+        version: v2
+    spec:
+      serviceAccountName: httpbin
+      containers:
+        - name: httpbin
+          image: docker.io/mccutchen/go-httpbin:v2.15.0
+          env:
+            - name: USE_REAL_HOSTNAME
+              value: "true"
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: curl
+  namespace: istio-lab
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: curl
+  namespace: istio-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: curl
+  template:
+    metadata:
+      labels:
+        app: curl
+    spec:
+      serviceAccountName: curl
+      containers:
+        - name: curl
+          image: docker.io/curlimages/curl:8.16.0
+          command: ["sleep", "infinity"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
