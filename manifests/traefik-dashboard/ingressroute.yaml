@@ -1,0 +1,22 @@
+# Expoe o dashboard do Traefik (ja vem com --api.dashboard=true no k3s, mas
+# so acessivel pelo entrypoint dedicado "traefik" :8080, que o Service
+# principal do Traefik nao publica). IngressRoute e um CRD do proprio
+# Traefik (nao do Kubernetes nativo) que direciona um path pro servico
+# interno especial "api@internal".
+#
+# Sem autenticacao de proposito - rede privada do lab, sandbox de estudo.
+# Se quiser proteger depois, da pra adicionar um Middleware basicAuth.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefik-dashboard
+  namespace: kube-system
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: PathPrefix(`/dashboard`) || PathPrefix(`/api`)
+      kind: Rule
+      services:
+        - name: api@internal
+          kind: TraefikService
