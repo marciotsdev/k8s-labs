@@ -1,0 +1,33 @@
+# RBAC "least privilege" pro provider-kubernetes -- so que faltou um recurso.
+#
+# Sintoma: o Object deste cenario fica com SYNCED: False pra sempre, mesmo com
+# o Provider e o ProviderConfig saudaveis. kubectl describe no Object mostra
+# um erro de permissao (forbidden) nos Events/Conditions.
+#
+# Pra praticar: o ClusterRoleBinding cluster-admin da instalacao base precisa
+# estar REMOVIDO antes (senao ele mascara o bug, ja que cobre tudo). Revert no
+# final: kubectl delete -f este arquivo + reaplicar
+# manifests/crossplane/provider-kubernetes-rbac.yaml.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: provider-kubernetes-scenario1
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # BUG: falta "secrets" aqui -- o Object abaixo pede pra gerenciar um Secret,
+  # e essa role so cobre ConfigMap.
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: provider-kubernetes-scenario1-binding
+subjects:
+  - kind: ServiceAccount
+    name: SUBSTITUIR_PELO_SA_REAL   # kubectl get sa -n crossplane-system | grep kubernetes
+    namespace: crossplane-system
+roleRef:
+  kind: ClusterRole
+  name: provider-kubernetes-scenario1
+  apiGroup: rbac.authorization.k8s.io
