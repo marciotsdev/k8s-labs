@@ -1,0 +1,15 @@
+# cluster-admin aqui e de proposito simples pra lab de estudo -- em producao
+# seria sobre-permissionamento real (bom candidato a cenario de troubleshooting
+# futuro: provider com acesso mais amplo do que as Compositions realmente usam).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: provider-kubernetes-admin-binding
+subjects:
+  - kind: ServiceAccount
+    name: provider-kubernetes-0ee03e22da98
+    namespace: crossplane-system
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
