@@ -4,6 +4,14 @@
 # o Provider e o ProviderConfig saudaveis. kubectl describe no Object mostra
 # um erro de permissao (forbidden) nos Events/Conditions.
 #
+# Por que Deployment e nao Secret/ConfigMap: o crossplane-rbac-manager gera
+# automaticamente, pra TODO provider, uma ClusterRole com acesso irrestrito a
+# secrets/configmaps/events/leases (necessario pro proprio funcionamento do
+# Crossplane). Isso significa que restringir manualmente esses recursos nunca
+# bloqueia nada de verdade -- a role automatica sempre cobre. Deployment (grupo
+# "apps") fica fora dessa role automatica, entao uma RBAC manual incompleta
+# aqui bloqueia o provider pra valer.
+#
 # Pra praticar: o ClusterRoleBinding cluster-admin da instalacao base precisa
 # estar REMOVIDO antes (senao ele mascara o bug, ja que cobre tudo). Revert no
 # final: kubectl delete -f este arquivo + reaplicar
@@ -16,8 +24,8 @@ rules:
   - apiGroups: [""]
     resources: ["configmaps"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  # BUG: falta "secrets" aqui -- o Object abaixo pede pra gerenciar um Secret,
-  # e essa role so cobre ConfigMap.
+  # BUG: falta o apiGroup "apps" / resource "deployments" aqui -- o Object
+  # abaixo pede pra gerenciar um Deployment, e essa role so cobre ConfigMap.
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

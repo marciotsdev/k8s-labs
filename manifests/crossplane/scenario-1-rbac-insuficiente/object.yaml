@@ -1,17 +1,28 @@
 apiVersion: kubernetes.crossplane.io/v1alpha2
 kind: Object
 metadata:
-  name: scenario1-secret
+  name: scenario1-deployment
 spec:
   forProvider:
     manifest:
-      apiVersion: v1
-      kind: Secret
+      apiVersion: apps/v1
+      kind: Deployment
       metadata:
         name: crossplane-scenario1
         namespace: default
-      stringData:
-        chave: valor
+      spec:
+        replicas: 1
+        selector:
+          matchLabels:
+            app: crossplane-scenario1
+        template:
+          metadata:
+            labels:
+              app: crossplane-scenario1
+          spec:
+            containers:
+              - name: nginx
+                image: nginx:alpine
   providerConfigRef:
     name: kubernetes-provider
   managementPolicies:
