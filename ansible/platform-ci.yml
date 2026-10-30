@@ -1,0 +1,9 @@
+---
+# Cluster de plataforma separado: Forgejo (repo git + registry) + Tekton
+# (CI/CD nativo de k8s). Single-node de proposito -- so o role k3s-cluster,
+# sem keda/karpenter (isso fica so no cluster principal k8s_labs).
+- hosts: k8s_labs
+  vars:
+    k3s_token_file: "{{ secrets_dir }}/k3s_platform_ci_token"
+  roles:
+    - k3s-cluster

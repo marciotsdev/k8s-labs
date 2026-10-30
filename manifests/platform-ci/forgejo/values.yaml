@@ -1,0 +1,24 @@
+# Forgejo instalado via chart oficial (oci://code.forgejo.org/forgejo-helm/forgejo),
+# que usa SQLite por padrao -- sem Postgres/Redis separado, minimo de pecas
+# pro cluster k8s-ci.
+#
+# Senha do admin fica num Secret a parte (gitea-admin-secret, criado
+# manualmente, nao versionado) -- ver docs/ se precisar recriar.
+
+persistence:
+  enabled: true
+  size: 10Gi
+
+service:
+  # k3s ja traz o ServiceLB (klipper-lb) embutido -- LoadBalancer aqui
+  # recebe o IP do proprio node (192.168.15.70) sem precisar de Ingress.
+  http:
+    type: LoadBalancer
+  ssh:
+    type: LoadBalancer
+
+gitea:
+  admin:
+    existingSecret: forgejo-admin-secret
+  config:
+    APP_NAME: 'Forgejo - k8s-ci (k8s-labs)'
