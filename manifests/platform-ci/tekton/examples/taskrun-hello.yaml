@@ -1,0 +1,10 @@
+# TaskRun = execucao concreta da Task "hello". Cada TaskRun cria um Pod
+# novo (o "runner" de verdade, sem registro previo -- ver conversa de ontem
+# sobre Forgejo Actions vs Tekton).
+apiVersion: tekton.dev/v1
+kind: TaskRun
+metadata:
+  generateName: hello-run-
+spec:
+  taskRef:
+    name: hello

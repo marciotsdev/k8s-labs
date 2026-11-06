@@ -1,0 +1,20 @@
+# Scan da imagem ja construida -- recebe IMAGE_URL/IMAGE_DIGEST como params,
+# vindos dos results da Task de build (buildah). Usar o digest (nao so a tag)
+# garante escanear exatamente a imagem que foi construida nesta execucao.
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: image-scan-trivy
+spec:
+  params:
+    - name: image-url
+      type: string
+    - name: image-digest
+      type: string
+  steps:
+    - name: trivy-image-scan
+      image: aquasec/trivy:latest
+      script: |
+        #!/bin/sh
+        set -e
+        trivy image --exit-code 1 --severity HIGH,CRITICAL "$(params.image-url)@$(params.image-digest)"

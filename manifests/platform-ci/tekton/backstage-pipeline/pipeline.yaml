@@ -1,0 +1,83 @@
+# Pipeline real do Backstage: clone -> test -> SAST -> SCA+secrets -> build ->
+# scan de imagem. O "sign" (Tekton Chains) NAO aparece aqui como Task -- o
+# Chains e um controller separado que observa o TaskRun do "build" e assina
+# sozinho, ao ver os results IMAGE_URL/IMAGE_DIGEST (convencao que a Task
+# "buildah" do Catalog ja emite nativamente).
+#
+# ATENCAO antes de aplicar: as versoes dos Tasks do Catalog (git-clone,
+# buildah) abaixo sao ilustrativas -- conferir a versao atual real em
+# hub.tekton.dev antes do primeiro apply.
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: backstage-build
+spec:
+  params:
+    - name: repo-url
+      type: string
+      description: "URL do repo no Forgejo, ex: http://192.168.15.70:3000/marcio/backstage.git"
+    - name: image-url
+      type: string
+      description: "ex: 192.168.15.70:3000/marcio/backstage"
+
+  workspaces:
+    - name: shared-data
+      description: "codigo clonado + artefatos de build, compartilhado entre Tasks"
+    - name: registry-credentials
+      description: "dockerconfig.json com credencial do registry (Forgejo packages)"
+
+  tasks:
+    - name: clone
+      taskRef:
+        resolver: hub
+        params:
+          - { name: catalog, value: tekton-catalog-tasks }
+          - { name: type, value: task }
+          - { name: name, value: git-clone }
+          - { name: version, value: "0.9" } # conferir versao real no Hub
+      workspaces:
+        - { name: output, workspace: shared-data }
+      params:
+        - { name: url, value: $(params.repo-url) }
+
+    - name: test
+      taskRef: { name: test }
+      runAfter: [clone]
+      workspaces:
+        - { name: source, workspace: shared-data }
+
+    - name: sast
+      taskRef: { name: sast-semgrep }
+      runAfter: [test]
+      workspaces:
+        - { name: source, workspace: shared-data }
+
+    - name: sca
+      taskRef: { name: sca-trivy }
+      runAfter: [sast]
+      workspaces:
+        - { name: source, workspace: shared-data }
+
+    - name: build
+      taskRef:
+        resolver: hub
+        params:
+          - { name: catalog, value: tekton-catalog-tasks }
+          - { name: type, value: task }
+          - { name: name, value: buildah }
+          - { name: version, value: "0.8" } # conferir versao real no Hub
+      runAfter: [sca]
+      workspaces:
+        - { name: source, workspace: shared-data }
+        - { name: dockerconfig, workspace: registry-credentials }
+      params:
+        - { name: IMAGE, value: $(params.image-url) }
+
+    - name: image-scan
+      taskRef: { name: image-scan-trivy }
+      runAfter: [build]
+      params:
+        # results emitidos pela Task "build" (buildah) -- mesmos dois nomes
+        # que o Tekton Chains observa pra assinar automaticamente.
+        - { name: image-url, value: $(tasks.build.results.IMAGE_URL) }
+        - { name: image-digest, value: $(tasks.build.results.IMAGE_DIGEST) }

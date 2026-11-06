@@ -1,0 +1,17 @@
+# SAST -- analisa o codigo-fonte clonado, sem executar nada.
+# --error faz o semgrep sair com codigo != 0 se achar findings, quebrando a Task.
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: sast-semgrep
+spec:
+  workspaces:
+    - name: source
+  steps:
+    - name: semgrep-scan
+      image: semgrep/semgrep:latest
+      workingDir: $(workspaces.source.path)
+      script: |
+        #!/bin/sh
+        set -e
+        semgrep scan --config auto --error

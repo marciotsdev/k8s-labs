@@ -1,0 +1,18 @@
+# Task customizada -- nao existe equivalente generico no Catalog (depende do
+# stack da aplicacao). Backstage e Node/Yarn.
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: test
+spec:
+  workspaces:
+    - name: source
+  steps:
+    - name: run-tests
+      image: node:20-slim
+      workingDir: $(workspaces.source.path)
+      script: |
+        #!/bin/sh
+        set -e
+        yarn install --immutable
+        yarn test

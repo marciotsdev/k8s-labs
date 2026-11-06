@@ -1,0 +1,13 @@
+# Exemplo minimo pra entender o conceito antes do pipeline real do Backstage.
+# Task = definicao reutilizavel de 1+ steps (cada step = 1 container).
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: hello
+spec:
+  steps:
+    - name: say-hello
+      image: alpine
+      script: |
+        #!/bin/sh
+        echo "Hello Tekton - rodando dentro de um Pod efemero, k8s-ci"
