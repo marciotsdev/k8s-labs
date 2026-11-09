@@ -9,12 +9,12 @@ vms = {
   k8s-labs-cp = {
     # Control plane (server) do cluster de estudo/troubleshooting - k3s
     # server + agents via token, cluster multi-no de proposito (ver docs/).
-    vm_id       = 2018
-    ip          = "192.168.15.67/24"
-    cores       = 2
-    memory      = 4096
-    disk        = 30
-    tags        = ["lab", "k8s", "env-labs"]
+    vm_id  = 2018
+    ip     = "192.168.15.67/24"
+    cores  = 2
+    memory = 6144
+    disk   = 30
+    tags   = ["lab", "k8s", "env-labs"]
     # Habilitado em 2026-10-21: o guest agent ja e instalado/iniciado pela
     # role k3s-cluster, mas o systemd so consegue ativar o servico se o canal
     # virtio existir na VM (agent=1 no Proxmox) - sem isso, "dependency job
