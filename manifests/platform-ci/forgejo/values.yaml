@@ -16,6 +16,13 @@ service:
     type: LoadBalancer
   ssh:
     type: LoadBalancer
+    # porta 22 colide com o sshd do proprio SO da VM -- o ServiceLB do k3s
+    # atribui o IP do node pro LoadBalancer, e o DNAT intercepta TODO
+    # trafego de entrada em <ip-do-node>:22 antes de chegar no sshd local,
+    # derrubando silenciosamente o acesso SSH administrativo a VM (achado
+    # real em 2026-11-09, log do sshd mostrava zero tentativas enquanto o
+    # handshake "funcionava" -- vinha do Forgejo, nao do SO).
+    port: 2222
 
 gitea:
   admin:
