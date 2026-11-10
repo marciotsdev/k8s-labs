@@ -1,0 +1,73 @@
+# Task propria de build (Buildah), escrita do zero em vez de reusar o Task
+# "buildah" do Catalog -- ele nao foi migrado pro novo sistema de bundles
+# OCI do Tekton (ghcr.io/tektoncd/catalog/upstream/tasks/buildah deu 404 em
+# 2026-11-10, ultima versao encontrada era de jul/2024, modelo antigo).
+# Tambem faz mais sentido ser nossa: a ramificacao dev/prd (ver abaixo) so
+# e possivel com a API imperativa do Buildah (from/run/copy/commit), que um
+# Task generico de catalogo nao ofereceria de qualquer forma.
+#
+# Emite IMAGE_URL/IMAGE_DIGEST (convencao que o Tekton Chains observa) --
+# ele assina a imagem sozinho ao ver esses 2 results, sem Task explicita
+# de "sign" no Pipeline.
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: build-buildah
+spec:
+  params:
+    - name: image-url
+      type: string
+      description: "ex: 192.168.15.70:3000/forgejo_admin/backstage"
+    - name: environment
+      type: string
+      default: "prd"
+      description: "dev ou prd -- controla se a imagem leva ferramenta de profiling"
+  workspaces:
+    - name: source
+    - name: registry-credentials
+  results:
+    - name: IMAGE_URL
+    - name: IMAGE_DIGEST
+  steps:
+    - name: build-and-push
+      image: quay.io/buildah/stable:v1
+      securityContext:
+        capabilities:
+          add: ["SETUID", "SETGID"]
+      workingDir: $(workspaces.source.path)
+      script: |
+        #!/bin/bash
+        set -euo pipefail
+        export STORAGE_DRIVER=vfs
+        export BUILDAH_FORMAT=docker
+
+        # autenticacao no registry a partir do Secret montado como workspace
+        mkdir -p /tmp/.docker
+        cp "$(workspaces.registry-credentials.path)/.dockerconfigjson" /tmp/.docker/config.json
+        export DOCKER_CONFIG=/tmp/.docker
+
+        ctr=$(buildah from node:20-bookworm-slim)
+
+        buildah copy "$ctr" . /app
+        buildah config --workingdir /app "$ctr"
+        buildah run "$ctr" -- yarn install --immutable
+        buildah run "$ctr" -- yarn build
+
+        # Ramificacao real, fora da imagem: so builds "dev" ganham a
+        # ferramenta de profiling -- em prd, esse passo nunca e chamado,
+        # zero traco na imagem (diferente de um RUN condicional dentro de
+        # um Dockerfile, que sempre gera camada mesmo quando e no-op).
+        if [ "$(params.environment)" = "dev" ]; then
+          buildah run "$ctr" -- yarn global add clinic
+        fi
+
+        buildah config --entrypoint '["node", "packages/backend", "--config", "app-config.yaml"]' "$ctr"
+
+        IMAGE_REF="$(params.image-url):latest"
+        buildah commit "$ctr" "$IMAGE_REF"
+        buildah push "$IMAGE_REF"
+
+        # results pro Tekton Chains assinar automaticamente
+        DIGEST=$(buildah images --format '{{.Digest}}' "$IMAGE_REF")
+        printf '%s' "$(params.image-url)" > "$(results.IMAGE_URL.path)"
+        printf '%s' "$DIGEST" > "$(results.IMAGE_DIGEST.path)"

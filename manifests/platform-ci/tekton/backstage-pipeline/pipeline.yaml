@@ -1,12 +1,14 @@
 # Pipeline real do Backstage: clone -> test -> SAST -> SCA+secrets -> build ->
 # scan de imagem. O "sign" (Tekton Chains) NAO aparece aqui como Task -- o
 # Chains e um controller separado que observa o TaskRun do "build" e assina
-# sozinho, ao ver os results IMAGE_URL/IMAGE_DIGEST (convencao que a Task
-# "buildah" do Catalog ja emite nativamente).
+# sozinho, ao ver os results IMAGE_URL/IMAGE_DIGEST que a nossa Task
+# build-buildah emite.
 #
-# ATENCAO antes de aplicar: as versoes dos Tasks do Catalog (git-clone,
-# buildah) abaixo sao ilustrativas -- conferir a versao atual real em
-# hub.tekton.dev antes do primeiro apply.
+# Atualizado em 2026-11-10: o Tekton Hub (hub.tekton.dev) foi descontinuado
+# -- git-clone agora via resolver "bundles" (OCI, ghcr.io), pinado no hash
+# de commit real confirmado no GHCR. O Task "buildah" do catalogo nao foi
+# migrado pro novo sistema (404 no bundle OCI, ultima versao de jul/2024) --
+# substituido pela nossa propria Task (build-buildah.yaml).
 apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
@@ -29,12 +31,11 @@ spec:
   tasks:
     - name: clone
       taskRef:
-        resolver: hub
+        resolver: bundles
         params:
-          - { name: catalog, value: tekton-catalog-tasks }
-          - { name: type, value: task }
+          - { name: bundle, value: "ghcr.io/tektoncd/catalog/upstream/tasks/git-clone:112374ce1262b133a77300bd8133445722605e04" }
           - { name: name, value: git-clone }
-          - { name: version, value: "0.9" } # conferir versao real no Hub
+          - { name: kind, value: task }
       workspaces:
         - { name: output, workspace: shared-data }
       params:
@@ -59,19 +60,13 @@ spec:
         - { name: source, workspace: shared-data }
 
     - name: build
-      taskRef:
-        resolver: hub
-        params:
-          - { name: catalog, value: tekton-catalog-tasks }
-          - { name: type, value: task }
-          - { name: name, value: buildah }
-          - { name: version, value: "0.8" } # conferir versao real no Hub
+      taskRef: { name: build-buildah }
       runAfter: [sca]
       workspaces:
         - { name: source, workspace: shared-data }
-        - { name: dockerconfig, workspace: registry-credentials }
+        - { name: registry-credentials, workspace: registry-credentials }
       params:
-        - { name: IMAGE, value: $(params.image-url) }
+        - { name: image-url, value: $(params.image-url) }
 
     - name: image-scan
       taskRef: { name: image-scan-trivy }
