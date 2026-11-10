@@ -1,0 +1,63 @@
+# RBAC proprio do EventListener. Em vez de reescrever a permissao que o
+# proprio Tekton Triggers ja define (o que deu errado na 1a tentativa --
+# faltou list/watch em interceptors/clustertriggerbindings/clusterinterceptors),
+# vinculamos aos 2 ClusterRoles que a instalacao do Triggers ja criou
+# especificamente pra isso: tekton-triggers-eventlistener-roles (namespaced)
+# e tekton-triggers-eventlistener-clusterroles (cluster-scoped).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tekton-triggers-forgejo-sa
+---
+# Permissao especifica nossa: criar o que o TriggerTemplate gera
+# (PipelineRun) -- isso NAO vem nos ClusterRoles padrao do Triggers,
+# que so cobrem os CRDs do proprio Triggers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tekton-triggers-forgejo-pipelinerun-role
+rules:
+  - apiGroups: ["tekton.dev"]
+    resources: ["pipelineruns"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tekton-triggers-forgejo-pipelinerun-binding
+subjects:
+  - kind: ServiceAccount
+    name: tekton-triggers-forgejo-sa
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: tekton-triggers-forgejo-pipelinerun-role
+---
+# Vinculo ao ClusterRole padrao do Triggers (namespaced: le TriggerBinding/
+# TriggerTemplate/Interceptor dentro do namespace "default").
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tekton-triggers-forgejo-eventlistener-binding
+subjects:
+  - kind: ServiceAccount
+    name: tekton-triggers-forgejo-sa
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tekton-triggers-eventlistener-roles
+---
+# Vinculo ao ClusterRole padrao do Triggers (cluster-scoped: le
+# ClusterTriggerBinding/ClusterInterceptor, que nao tem namespace).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tekton-triggers-forgejo-eventlistener-clusterbinding
+subjects:
+  - kind: ServiceAccount
+    name: tekton-triggers-forgejo-sa
+    namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tekton-triggers-eventlistener-clusterroles

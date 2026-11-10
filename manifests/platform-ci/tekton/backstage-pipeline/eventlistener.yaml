@@ -1,0 +1,21 @@
+# EventListener: o servico de verdade (sobe Deployment+Service) que recebe
+# o webhook. Interceptor "cel" filtra por tipo de evento, ja que nao existe
+# interceptor nativo pro Forgejo/Gitea (so github/gitlab/bitbucket/slack/cel).
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: forgejo-listener
+spec:
+  serviceAccountName: tekton-triggers-forgejo-sa
+  triggers:
+    - name: forgejo-push-trigger
+      interceptors:
+        - ref:
+            name: "cel"
+          params:
+            - name: "filter"
+              value: "header.match('X-Gitea-Event', 'push')"
+      bindings:
+        - ref: forgejo-push-binding
+      template:
+        ref: backstage-build-template

@@ -1,0 +1,37 @@
+# TriggerTemplate: o molde do PipelineRun criado a cada push valido.
+# Workspaces resolvidos aqui (nao no Pipeline): shared-data via
+# VolumeClaimTemplate (criado e destruido junto do PipelineRun -- decisao
+# ja tomada quando estudamos Workspace), registry-credentials aponta pro
+# Secret com o dockerconfig.json do registry do Forgejo (ainda a criar).
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: backstage-build-template
+spec:
+  params:
+    - name: git-repo-url
+    - name: git-revision
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        generateName: backstage-build-
+      spec:
+        pipelineRef:
+          name: backstage-build
+        params:
+          - name: repo-url
+            value: $(tt.params.git-repo-url)
+          - name: image-url
+            value: "192.168.15.70:3000/forgejo_admin/backstage"
+        workspaces:
+          - name: shared-data
+            volumeClaimTemplate:
+              spec:
+                accessModes: ["ReadWriteOnce"]
+                resources:
+                  requests:
+                    storage: 1Gi
+          - name: registry-credentials
+            secret:
+              secretName: forgejo-registry-credentials

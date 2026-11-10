@@ -1,0 +1,13 @@
+# TriggerBinding: extrai campos do corpo (JSON) do webhook de push do
+# Forgejo/Gitea. Formato do payload documentado em:
+# https://forgejo.org/docs/latest/user/webhooks/ (mesmo shape do Gitea).
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: forgejo-push-binding
+spec:
+  params:
+    - name: git-repo-url
+      value: $(body.repository.clone_url)
+    - name: git-revision
+      value: $(body.after)
