@@ -29,3 +29,17 @@ gitea:
     existingSecret: forgejo-admin-secret
   config:
     APP_NAME: 'Forgejo - k8s-ci (k8s-labs)'
+    server:
+      # ROOT_URL ficava no placeholder padrao do chart (git.example.com) --
+      # nao bloqueava nada enquanto clonavamos direto pelo IP na mao, mas
+      # quebrou de verdade o clone_url que o Forgejo gera no payload do
+      # webhook (achado real em 2026-11-10: "Could not resolve host:
+      # git.example.com").
+      ROOT_URL: 'http://192.168.15.70:3000/'
+    webhook:
+      # Protecao padrao contra SSRF do proprio Forgejo bloqueia webhook pra
+      # qualquer endereco "privado" por padrao -- precisa permitir
+      # explicitamente o DNS interno do cluster pro EventListener do Tekton
+      # Triggers (achado real em 2026-11-10: "webhook can only call allowed
+      # HTTP server").
+      ALLOWED_HOST_LIST: '*.svc.cluster.local'
