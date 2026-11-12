@@ -10,8 +10,8 @@ vms = {
     # disparado pelo Tekton no platform-ci.
     vm_id         = 2022
     ip            = "192.168.15.71/24"
-    cores         = 2
-    memory        = 4096
+    cores         = 3
+    memory        = 6144
     disk          = 30
     tags          = ["lab", "k8s", "env-platform-backstage"]
     agent_enabled = true
