@@ -9,10 +9,28 @@ spec:
     - name: source
   steps:
     - name: run-tests
-      image: node:20-slim
+      # node:20-slim (20.20.2) nao tem binario pre-compilado no
+      # prebuild-install pra better-sqlite3/cpu-features, cai pro build
+      # manual via node-gyp e bate num bug real do node-gyp 13.x com undici
+      # (achado em 2026-11-11: "TypeError: Cannot read properties of
+      # undefined (reading 'bind')"). node:22-slim tem cobertura de binario
+      # pre-compilado mais ampla, evita cair no build manual.
+      image: node:22-slim
       workingDir: $(workspaces.source.path)
+      env:
+        # sem isso, o `yarn test` do Backstage (Jest) cai no modo watch
+        # interativo por padrao e o processo nunca sai -- achado em
+        # 2026-11-11, pod ficava "Running" indefinidamente mesmo depois do
+        # log mostrar "PASS"/"Ran all test suites".
+        - name: CI
+          value: "true"
       script: |
         #!/bin/sh
         set -e
-        yarn install --immutable
+        # node:20-slim nao traz toolchain de build -- alguns pacotes nativos
+        # do Backstage (better-sqlite3, ssh2/cpu-features) precisam compilar
+        # na instalacao (achado real em 2026-11-11, yarn install falhava em
+        # "couldn't be built successfully" nesses dois pacotes).
+        apt-get update -qq && apt-get install -y -qq --no-install-recommends python3 make g++ > /dev/null
+        yarn install --immutable || { echo "--- build.log dos pacotes nativos ---"; cat /tmp/xfs-*/build.log 2>/dev/null; exit 1; }
         yarn test

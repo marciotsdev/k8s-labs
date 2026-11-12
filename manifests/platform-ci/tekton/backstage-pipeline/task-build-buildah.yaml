@@ -33,13 +33,22 @@ spec:
       image: quay.io/buildah/stable:v1
       securityContext:
         capabilities:
-          add: ["SETUID", "SETGID"]
+          # SYS_ADMIN necessario pro "mount --make-rprivate /" que o
+          # buildah faz antes de montar o chroot, mesmo com
+          # BUILDAH_ISOLATION=chroot -- buildah unshare (sem essa
+          # capability) bateu numa segunda parede real de seccomp
+          # (memfd_create: Invalid argument), achado em 2026-11-12.
+          # Decisao consciente de abrir mao de isolamento aqui por ser lab
+          # isolado, nao cluster regulado -- mesma fricao real que a doc do
+          # OpenShift Pipelines reconhece (ver buildah-interview-prep).
+          add: ["SETUID", "SETGID", "SYS_ADMIN"]
       workingDir: $(workspaces.source.path)
       script: |
         #!/bin/bash
         set -euo pipefail
         export STORAGE_DRIVER=vfs
         export BUILDAH_FORMAT=docker
+        export BUILDAH_ISOLATION=chroot
 
         # autenticacao no registry a partir do Secret montado como workspace
         mkdir -p /tmp/.docker

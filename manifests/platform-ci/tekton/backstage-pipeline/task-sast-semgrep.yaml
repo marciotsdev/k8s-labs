@@ -10,8 +10,13 @@ spec:
   steps:
     - name: semgrep-scan
       image: semgrep/semgrep:latest
-      workingDir: $(workspaces.source.path)
       script: |
         #!/bin/sh
         set -e
+        # a imagem do semgrep assume a convencao "docker run -v $PWD:/src"
+        # e quebra com "Detected Docker environment without a code volume"
+        # se o cwd padrao nao for /src (achado em 2026-11-11) -- symlink
+        # resolve sem precisar mudar o workspace do Tekton.
+        ln -s "$(workspaces.source.path)" /src
+        cd /src
         semgrep scan --config auto --error
