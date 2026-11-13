@@ -42,6 +42,15 @@ spec:
           # isolado, nao cluster regulado -- mesma fricao real que a doc do
           # OpenShift Pipelines reconhece (ver buildah-interview-prep).
           add: ["SETUID", "SETGID", "SYS_ADMIN"]
+        # AppArmor (RuntimeDefault do containerd) bloqueia mount()
+        # independente de capability/seccomp liberados. A tentativa via
+        # annotation no podTemplate do Tekton nao funcionou -- esse campo
+        # nao existe no PodTemplate do Tekton (TriggerTemplate aplicou e
+        # voltou {} vazio). Campo nativo appArmorProfile (GA desde k8s
+        # 1.30, cluster aqui roda 1.36) e o jeito certo, direto no
+        # securityContext do step (achado em 2026-11-12).
+        appArmorProfile:
+          type: Unconfined
       workingDir: $(workspaces.source.path)
       script: |
         #!/bin/bash
@@ -54,13 +63,12 @@ spec:
         mkdir -p /tmp/.docker
         cp "$(workspaces.registry-credentials.path)/.dockerconfigjson" /tmp/.docker/config.json
         export DOCKER_CONFIG=/tmp/.docker
-
-        ctr=$(buildah from node:20-bookworm-slim)
+        ctr=$(buildah from node:22-bookworm-slim)
 
         buildah copy "$ctr" . /app
         buildah config --workingdir /app "$ctr"
         buildah run "$ctr" -- yarn install --immutable
-        buildah run "$ctr" -- yarn build
+        buildah run "$ctr" -- yarn build:backend
 
         # Ramificacao real, fora da imagem: so builds "dev" ganham a
         # ferramenta de profiling -- em prd, esse passo nunca e chamado,
@@ -74,7 +82,7 @@ spec:
 
         IMAGE_REF="$(params.image-url):latest"
         buildah commit "$ctr" "$IMAGE_REF"
-        buildah push "$IMAGE_REF"
+        buildah push --tls-verify=false "$IMAGE_REF"
 
         # results pro Tekton Chains assinar automaticamente
         DIGEST=$(buildah images --format '{{.Digest}}' "$IMAGE_REF")
