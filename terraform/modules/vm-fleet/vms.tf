@@ -26,6 +26,10 @@ resource "proxmox_virtual_environment_vm" "this" {
 
   memory {
     dedicated = each.value.memory
+    # floating < dedicated habilita o balloon device (floating = minimo
+    # garantido ao guest, dedicated = teto). Sem isso o host nao reclama RAM
+    # ociosa do guest -- ver comentario em variables.tf.
+    floating = coalesce(each.value.memory_floating, floor(each.value.memory / 2))
   }
 
   disk {

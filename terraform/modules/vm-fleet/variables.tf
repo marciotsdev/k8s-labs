@@ -42,6 +42,16 @@ variable "vms" {
     memory = number
     disk   = number
 
+    # Minimo do balloon device (memory.floating da API Proxmox) -- sem isso
+    # (floating == dedicated, ou balloon=0), o QEMU aloca "memory" de forma
+    # fixa assim que o guest toca essas paginas (cache de pagina do Linux
+    # enche RAM livre por padrao), e o host nunca reave essa RAM mesmo que
+    # o guest reporte quase tudo como cache reclamavel. Default e metade de
+    # "memory" -- da pro host reclamar RAM ociosa sem arriscar o guest
+    # realmente precisar e nao ter (achado em 2026-11-14, host do Proxmox
+    # ficou indisponivel com RAM pinada em VMs que so usavam cache).
+    memory_floating = optional(number)
+
     sockets        = optional(number, 1)
     cpu_type       = optional(string, "host")
     tags           = optional(list(string), ["lab"])
