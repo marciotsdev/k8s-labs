@@ -37,8 +37,11 @@ vms = {
     # hoje disputam tudo com o control plane no mesmo node.
     vm_id         = 2023
     ip            = "192.168.15.72/24"
-    cores         = 2
-    memory        = 6144
+    # 2 cores/6144MB -> 4 cores/8192MB: node chegou a 97.78% CPU e 100.69%
+    # memoria (estourando pra swap) rodando yarn install + bundle webpack
+    # do build:backend/build:all (achado em 2026-11-14).
+    cores         = 4
+    memory        = 8192
     disk          = 40
     tags          = ["lab", "k8s", "env-platform-ci"]
     agent_enabled = true
