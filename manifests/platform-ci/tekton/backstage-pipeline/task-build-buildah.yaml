@@ -31,6 +31,24 @@ spec:
   steps:
     - name: build-and-push
       image: quay.io/buildah/stable:v1
+      # Limite explicito de memoria no step -- sem isso, nada impede o Pod
+      # de tomar 100% da RAM do node sozinho (nao ha vizinho nenhum pra
+      # culpar, e literalmente so ele rodando no w1). Acima do NODE_OPTIONS
+      # (8192Mi de heap) pra sobrar espaco pro overhead nativo do V8/yarn e
+      # pro proprio Buildah+vfs, mas abaixo da RAM total do node (12Gi) pra
+      # deixar folga pro SO/kubelet -- objetivo e o kubelet matar o Pod com
+      # OOMKilled (sinal claro no log) em vez do node inteiro degradar/
+      # entrar em swap (achado em 2026-11-14, resize de RAM da VM sozinho
+      # nao resolveu).
+      # Tekton renomeou o campo de "resources" pra "computeResources" (TEP-0070,
+      # pra nao confundir com o antigo conceito deprecated de PipelineResources)
+      # -- "resources" deu strict decoding error: unknown field (achado em
+      # 2026-11-14).
+      computeResources:
+        requests:
+          memory: "8Gi"
+        limits:
+          memory: "10Gi"
       securityContext:
         capabilities:
           # SYS_ADMIN necessario pro "mount --make-rprivate /" que o
@@ -67,8 +85,16 @@ spec:
 
         buildah copy "$ctr" . /app
         buildah config --workingdir /app "$ctr"
-        buildah run "$ctr" -- yarn install --immutable
-        buildah run "$ctr" -- yarn build:backend
+
+        # Capa o heap do Node no proprio processo de build -- sem isso o V8
+        # cresce o heap sem limite ate engolir toda a RAM visivel do
+        # container (que e a RAM inteira do node, via vfs/chroot), estourando
+        # o host pra swap mesmo depois de dobrar a RAM da VM duas vezes
+        # (achado em 2026-11-14). --env e so pra este "buildah run", nao fica
+        # gravado na imagem final.
+        NODE_BUILD_ENV="NODE_OPTIONS=--max-old-space-size=8192"
+        buildah run --env "$NODE_BUILD_ENV" "$ctr" -- yarn install --immutable
+        buildah run --env "$NODE_BUILD_ENV" "$ctr" -- yarn build:backend
 
         # Ramificacao real, fora da imagem: so builds "dev" ganham a
         # ferramenta de profiling -- em prd, esse passo nunca e chamado,
