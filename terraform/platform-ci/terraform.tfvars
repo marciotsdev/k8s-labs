@@ -41,7 +41,7 @@ vms = {
     # memoria (estourando pra swap) rodando yarn install + bundle webpack
     # do build:backend/build:all (achado em 2026-11-14).
     cores         = 4
-    memory        = 8192
+    memory        = 12288
     disk          = 40
     tags          = ["lab", "k8s", "env-platform-ci"]
     agent_enabled = true
