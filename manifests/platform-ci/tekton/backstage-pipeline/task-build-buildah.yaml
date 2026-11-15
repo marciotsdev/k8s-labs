@@ -82,9 +82,14 @@ spec:
 
         IMAGE_REF="$(params.image-url):latest"
         buildah commit "$ctr" "$IMAGE_REF"
-        buildah push --tls-verify=false "$IMAGE_REF"
+        # --digestfile grava o digest REAL do manifesto que foi pro
+        # registry -- "buildah images" (usado antes) le o digest local do
+        # storage do Buildah, que pode nao bater com o recalculado pelo
+        # registry no push, e a Task image-scan quebrava com
+        # MANIFEST_UNKNOWN (achado em 2026-11-13).
+        buildah push --tls-verify=false --digestfile /tmp/digest.txt "$IMAGE_REF"
 
         # results pro Tekton Chains assinar automaticamente
-        DIGEST=$(buildah images --format '{{.Digest}}' "$IMAGE_REF")
+        DIGEST=$(cat /tmp/digest.txt)
         printf '%s' "$(params.image-url)" > "$(results.IMAGE_URL.path)"
         printf '%s' "$DIGEST" > "$(results.IMAGE_DIGEST.path)"
