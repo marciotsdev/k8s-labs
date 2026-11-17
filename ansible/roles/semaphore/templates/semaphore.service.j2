@@ -10,6 +10,12 @@ WorkingDirectory=/var/lib/semaphore
 ExecStart=/usr/bin/semaphore server --config /etc/semaphore/config.json
 Restart=on-failure
 RestartSec=5
+# KillMode=process (em vez do default "control-group"): ao parar o servico,
+# mata so o processo principal, nao o cgroup inteiro -- sem isso, quando o
+# proprio Semaphore roda um playbook contra si mesmo e esse playbook para o
+# servico, o job em andamento (processo filho do ansible-playbook/runner)
+# tambem morre junto, travando a task pra sempre (achado em 2026-11-17).
+KillMode=process
 
 [Install]
 WantedBy=multi-user.target

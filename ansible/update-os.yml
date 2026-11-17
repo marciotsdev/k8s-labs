@@ -1,0 +1,31 @@
+---
+# Patch management basico das VMs do lab -- roda via Semaphore (projeto
+# k8s-lab, inventory "all-vms") ou pelo terminal. NAO reinicia nada sozinho
+# (nem servico, nem VM) -- so atualiza pacotes e avisa se reboot ficou
+# pendente, pra decisao manual (um k3s-agent reiniciado sem aviso no meio
+# de um pipeline rodando seria pior que o CVE que estamos corrigindo).
+- hosts: all_vms
+  become: true
+  tasks:
+    - name: Atualiza o indice de pacotes
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Aplica upgrade de pacotes (so patches dentro do release atual, nao dist-upgrade)
+      ansible.builtin.apt:
+        upgrade: safe
+
+    - name: Remove pacotes orfaos
+      ansible.builtin.apt:
+        autoremove: true
+
+    - name: Verifica se a VM pede reboot (kernel/libs criticas atualizadas)
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: reboot_required
+
+    - name: Avisa se reboot ficou pendente (decisao manual, nunca automatico)
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: reboot pendente apos o upgrade -- reiniciar manualmente quando for seguro (fora de horario de pipeline/estudo)"
+      when: reboot_required.stat.exists

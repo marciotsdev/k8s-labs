@@ -1,7 +1,10 @@
 ---
-semaphore_secrets_dir: "{{ secrets_dir }}"
 semaphore_admin_email: "admin@lab.local"
-# Senha lida de secrets/semaphore_admin_password (gitignored) -- nunca
-# hardcoded aqui. Gerar uma vez com:
-#   openssl rand -base64 18 > secrets/semaphore_admin_password
-semaphore_admin_password: "{{ lookup('file', secrets_dir + '/semaphore_admin_password') }}"
+# CORRECAO (2026-11-17): nao vem mais de arquivo local (secrets_dir) --
+# isso so funcionava rodando no terminal; via Semaphore o clone temporario
+# nunca tem a pasta secrets/ (esta no .gitignore de proposito), e dava erro
+# de lookup. Sem default aqui de proposito -- fica obrigatorio passar de
+# fora, dos dois jeitos possiveis:
+# - Terminal: --extra-vars "semaphore_admin_password=$(cat secrets/semaphore_admin_password)"
+# - Semaphore: Variable Group (aba Secrets) associado ao Template, mesma
+#   chave de nome "semaphore_admin_password"
