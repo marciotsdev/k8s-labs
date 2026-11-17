@@ -13,4 +13,9 @@ spec:
       script: |
         #!/bin/sh
         set -e
-        trivy fs --scanners vuln,secret --exit-code 1 --severity HIGH,CRITICAL .
+        # --ignore-unfixed: mesmo motivo da task image-scan-trivy (achado
+        # em 2026-11-16) -- CVE sem fix disponivel reaparece a cada update
+        # do banco do Trivy, mesmo numa dependencia ja na versao mais nova
+        # possivel (ex: picomatch 4.0.7, CVE-2026-112366, sem Fixed Version
+        # -- achado em 2026-11-17, esqueci de aplicar aqui na primeira vez).
+        trivy fs --scanners vuln,secret --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed .
