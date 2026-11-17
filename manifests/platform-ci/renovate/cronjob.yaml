@@ -7,11 +7,13 @@ kind: CronJob
 metadata:
   name: renovate
 spec:
-  # Schedule aqui e so o fallback/garantia -- o schedule "real" (quando ele
-  # de fato abre PR) e controlado pelo renovate.json no repo do Backstage.
-  # Rodar o CronJob toda noite e seguro porque o Renovate respeita o
-  # schedule interno e sai rapido sem fazer nada fora da janela.
-  schedule: "0 3 * * *"
+  # De hora em hora, nao um horario fixo -- o Proxmox do lab fica desligado
+  # na maior parte do tempo, so liga quando ha sessao de estudo. Um horario
+  # fixo (ex: 3h da manha) nunca dispara de verdade, e o k3s nao recupera
+  # execucoes de CronJob perdidas por padrao. De hora em hora cobre qualquer
+  # sessao, sem depender de coincidir com um horario especifico (achado em
+  # 2026-11-16).
+  schedule: "0 * * * *"
   jobTemplate:
     spec:
       backoffLimit: 1
