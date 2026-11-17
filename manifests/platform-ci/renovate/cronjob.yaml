@@ -1,0 +1,37 @@
+# Renovate CLI standalone (nao a app CE da Mend -- essa nao suporta Forgejo)
+# rodando como CronJob no proprio cluster k8s-ci, igual o resto da
+# plataforma de CI. Token do bot "renovate-bot" fica no Secret
+# "renovate-forgejo-token", criado fora do git (ver secrets/renovate_forgejo_token).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: renovate
+spec:
+  # Schedule aqui e so o fallback/garantia -- o schedule "real" (quando ele
+  # de fato abre PR) e controlado pelo renovate.json no repo do Backstage.
+  # Rodar o CronJob toda noite e seguro porque o Renovate respeita o
+  # schedule interno e sai rapido sem fazer nada fora da janela.
+  schedule: "0 3 * * *"
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: renovate
+              image: renovate/renovate:latest
+              env:
+                - name: RENOVATE_PLATFORM
+                  value: "forgejo"
+                - name: RENOVATE_ENDPOINT
+                  value: "http://192.168.15.70:3000/api/v1"
+                - name: RENOVATE_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: renovate-forgejo-token
+                      key: token
+                - name: RENOVATE_AUTODISCOVER
+                  value: "false"
+              args:
+                - "forgejo_admin/backstage"
