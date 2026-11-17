@@ -1,0 +1,18 @@
+---
+# Teste minimo pra validar o Semaphore UI em si -- so conectividade, sem
+# secrets, sem mexer em nenhum servico (evita os dois problemas achados em
+# 2026-11-17: auto-referencia ao reiniciar o proprio Semaphore, e secrets_dir
+# relativo nao existir no clone temporario que o Semaphore faz).
+- hosts: platform_ops
+  gather_facts: true
+  tasks:
+    - name: Testa conectividade SSH/Ansible
+      ansible.builtin.ping:
+
+    - name: Mostra info basica do host
+      ansible.builtin.debug:
+        msg: "OK -- rodando via Semaphore em {{ inventory_hostname }} ({{ ansible_default_ipv4.address }}), kernel {{ ansible_kernel }}"
+
+    - name: Mostra uma variavel vinda do Variable Group do Semaphore (prova de conceito)
+      ansible.builtin.debug:
+        msg: "test_variable = {{ test_variable | default('(nao definida -- Variable Group nao associado ou variavel ausente)') }}"
