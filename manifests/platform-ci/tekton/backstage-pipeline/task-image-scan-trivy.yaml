@@ -33,4 +33,12 @@ spec:
         CVE-2026-104848
         CVE-2026-104849
         EOF
-        trivy image --exit-code 1 --severity HIGH,CRITICAL --ignorefile /tmp/.trivyignore "$(params.image-url)@$(params.image-digest)"
+        # --ignore-unfixed: a maioria dos CVEs de pacote de SO que sobram
+        # (util-linux, systemd, ncurses, perl-base, zlib novo) tem status
+        # "affected"/"fix_deferred" no Debian -- sem "Fixed Version"
+        # nenhuma, ou seja, sem correcao disponivel pra aplicar de jeito
+        # nenhum. Sem essa flag, cada atualizacao do banco de CVE do Trivy
+        # (baixado toda execucao) pode acusar CVE novo nos MESMOS pacotes
+        # antigos, travando o pipeline pra sempre -- caca-lo um por um no
+        # .trivyignore nao escala (achado em 2026-11-16).
+        trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --ignorefile /tmp/.trivyignore "$(params.image-url)@$(params.image-digest)"

@@ -83,6 +83,17 @@ spec:
         export DOCKER_CONFIG=/tmp/.docker
         ctr=$(buildah from node:22-bookworm-slim)
 
+        # Atualiza os pacotes de SO pra pegar qualquer fix de seguranca que
+        # ja exista mas nao estava na imagem base publicada -- nao resolve
+        # CVE sem fix disponivel (isso fica pro --ignore-unfixed do Trivy),
+        # mas reduz a exposicao real a qualquer CVE que ja tenha patch
+        # (achado em 2026-11-16: nenhum dos 37 CVEs de SO vistos tinha
+        # "Fixed Version", entao isso sozinho nao teria zerado o scan --
+        # ainda assim e boa pratica manter a imagem atualizada).
+        buildah run "$ctr" -- apt-get update
+        buildah run "$ctr" -- apt-get upgrade -y
+        buildah run "$ctr" -- apt-get clean
+
         buildah copy "$ctr" . /app
         buildah config --workingdir /app "$ctr"
 
