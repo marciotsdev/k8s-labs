@@ -43,34 +43,62 @@
     deb: "/tmp/semaphore_{{ semaphore_version }}.deb"
   become: true
 
-- name: Garante que o diretorio de secrets existe no controlador
-  ansible.builtin.file:
-    path: "{{ semaphore_secrets_dir }}"
-    state: directory
-    mode: "0700"
-  delegate_to: localhost
-  become: false
-  run_once: true
+# CORRECAO (2026-11-17): as chaves de criptografia NAO podem viver no
+# controlador (secrets_dir, via delegate_to localhost) -- isso so funciona
+# quando o playbook roda no terminal do usuario. Quando o proprio Semaphore
+# roda esse playbook, "localhost" vira a VM semaphore-ui dentro de um clone
+# temporario novo a cada execucao -- o "creates:" nunca encontrava o arquivo
+# "antigo", entao a role gerava chaves NOVAS a cada run, sobrescrevendo o
+# config.json real e invalidando tudo que ja estava criptografado com a
+# chave anterior (ex: a SSH key do Key Store -- erro real: "encryption key
+# id ... not found in keyset"). Fix: as chaves vivem no HOST REMOTO, lidas
+# do config.json existente se ja tiver rodado antes, geradas so na primeira
+# vez (idempotente de verdade, independente de onde o playbook roda).
+- name: Verifica se o config.json do Semaphore ja existe (pra reusar as chaves de criptografia ja em uso)
+  ansible.builtin.stat:
+    path: /etc/semaphore/config.json
+  become: true
+  register: semaphore_config_stat
 
-- name: Gera as chaves de criptografia do Semaphore (uma vez so -- nao regenerar, senao sessoes/dados existentes ficam ilegiveis)
-  ansible.builtin.shell: |
-    set -e
-    for f in semaphore_cookie_hash semaphore_cookie_encryption semaphore_access_key_encryption; do
-      if [ ! -f "{{ semaphore_secrets_dir }}/$f" ]; then
-        openssl rand -base64 32 > "{{ semaphore_secrets_dir }}/$f"
-      fi
-    done
-  args:
-    creates: "{{ semaphore_secrets_dir }}/semaphore_access_key_encryption"
-  delegate_to: localhost
-  become: false
-  run_once: true
+- name: Le as chaves de criptografia ja existentes (se o config.json ja existir)
+  ansible.builtin.slurp:
+    src: /etc/semaphore/config.json
+  become: true
+  register: semaphore_config_existing
+  when: semaphore_config_stat.stat.exists
 
-- name: Le as chaves de criptografia geradas
+- name: Gera chaves de criptografia novas (so na primeira vez, direto no host remoto)
+  ansible.builtin.shell: openssl rand -base64 32
+  register: semaphore_new_cookie_hash
+  when: not semaphore_config_stat.stat.exists
+  changed_when: false
+
+- name: Gera chaves de criptografia novas (so na primeira vez, direto no host remoto)
+  ansible.builtin.shell: openssl rand -base64 32
+  register: semaphore_new_cookie_encryption
+  when: not semaphore_config_stat.stat.exists
+  changed_when: false
+
+- name: Gera chaves de criptografia novas (so na primeira vez, direto no host remoto)
+  ansible.builtin.shell: openssl rand -base64 32
+  register: semaphore_new_access_key_encryption
+  when: not semaphore_config_stat.stat.exists
+  changed_when: false
+
+- name: Define as chaves de criptografia a usar (reusadas ou recem-geradas)
   ansible.builtin.set_fact:
-    semaphore_cookie_hash: "{{ lookup('file', semaphore_secrets_dir + '/semaphore_cookie_hash') }}"
-    semaphore_cookie_encryption: "{{ lookup('file', semaphore_secrets_dir + '/semaphore_cookie_encryption') }}"
-    semaphore_access_key_encryption: "{{ lookup('file', semaphore_secrets_dir + '/semaphore_access_key_encryption') }}"
+    semaphore_cookie_hash: >-
+      {{ (semaphore_config_existing.content | b64decode | from_json).cookie_hash
+         if semaphore_config_stat.stat.exists
+         else semaphore_new_cookie_hash.stdout }}
+    semaphore_cookie_encryption: >-
+      {{ (semaphore_config_existing.content | b64decode | from_json).cookie_encryption
+         if semaphore_config_stat.stat.exists
+         else semaphore_new_cookie_encryption.stdout }}
+    semaphore_access_key_encryption: >-
+      {{ (semaphore_config_existing.content | b64decode | from_json).access_key_encryption
+         if semaphore_config_stat.stat.exists
+         else semaphore_new_access_key_encryption.stdout }}
 
 - name: Cria o usuario de sistema "semaphore" (o .deb nao traz um -- so o binario)
   ansible.builtin.user:
