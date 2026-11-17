@@ -17,4 +17,20 @@ spec:
       script: |
         #!/bin/sh
         set -e
-        trivy image --exit-code 1 --severity HIGH,CRITICAL "$(params.image-url)@$(params.image-digest)"
+        # CVEs aceitos conscientemente -- sem fix disponivel upstream, nao
+        # da pra "resolver" rebuildando a imagem. Revisar periodicamente se
+        # o Debian/base image muda esse status (achado em 2026-11-15).
+        cat > /tmp/.trivyignore <<'EOF'
+        # zlib: integer overflow -- Debian marcou will_not_fix no bookworm,
+        # sem pacote corrigido disponivel no momento.
+        CVE-2023-45853
+        # tinypool: vendorizado dentro do @rspack/core (app/node_modules/
+        # @rspack/core/compiled/tinypool), nao e dependencia resolvivel via
+        # resolutions/overrides -- so da pra corrigir bumping @rspack/core
+        # inteiro quando existir uma versao que atualize o tinypool
+        # vendorizado. Revisar quando o Backstage/rspack subir de versao
+        # (achado em 2026-11-15).
+        CVE-2026-104848
+        CVE-2026-104849
+        EOF
+        trivy image --exit-code 1 --severity HIGH,CRITICAL --ignorefile /tmp/.trivyignore "$(params.image-url)@$(params.image-digest)"

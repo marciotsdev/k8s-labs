@@ -11,10 +11,10 @@ vms = {
   k8s-ci-cp = {
     # Forgejo (repo git + registry) + Tekton (CI/CD nativo de k8s), cluster
     # de plataforma separado do k8s-labs principal e do platform-backstage.
-    vm_id         = 2021
-    ip            = "192.168.15.70/24"
-    cores         = 4
-    memory        = 8192
+    vm_id  = 2021
+    ip     = "192.168.15.70/24"
+    cores  = 4
+    memory = 8192
     # 40 -> 80: Buildah com STORAGE_DRIVER=vfs nao usa copy-on-write (cada
     # "buildah from" duplica a camada inteira), e o Tekton nao limpa Pods/
     # Workspaces sozinho -- varias tentativas de pipeline no mesmo dia
@@ -35,14 +35,40 @@ vms = {
     # (ver comentario no topo deste arquivo). Adicionado pra dar mais
     # ephemeral-storage/CPU disponivel pros Pods do pipeline Tekton, que
     # hoje disputam tudo com o control plane no mesmo node.
-    vm_id         = 2023
-    ip            = "192.168.15.72/24"
+    vm_id = 2023
+    ip    = "192.168.15.72/24"
     # 2 cores/6144MB -> 4 cores/8192MB: node chegou a 97.78% CPU e 100.69%
     # memoria (estourando pra swap) rodando yarn install + bundle webpack
     # do build:backend/build:all (achado em 2026-11-14).
+    cores           = 4
+    memory          = 12288
+    memory_floating = 12288
+    # 122880 era TB, nao GB -- esse campo e em GB (diferente de "memory",
+    # que e em MB). O erro de unidade passou pelo terraform apply sem falhar
+    # porque local-lvm e thin-provisioned, e o growpart/resize2fs do
+    # cloud-init corrompeu o ext4 tentando expandir a particao pra 120TB
+    # de uma vez (achado em 2026-11-15, "Inode bitmap checksum does not
+    # match bitmap"). VM recriada do zero com o valor certo.
+    disk          = 120
+    tags          = ["lab", "k8s", "env-platform-ci"]
+    agent_enabled = true
+    dns_servers   = ["192.168.15.65", "192.168.15.1"]
+    ssh_keys = [
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBO3BiGOxRN29Jfas+UGS0hV+JGKZedAl+IMpzwrzLs8 homelab-terraform-ansible",
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBogEzcV72H1vVmvC849JTMTFYguxVw5QKl4JX85fRj0 thundercat@windows-claude",
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJJbotLXtaqwLd2a8vYRCOO3YbpMgIuMevYKhz9NoHJ4 root@pve",
+    ]
+  }
+  k8s-ci-w2 = {
+    # Segundo agent do cluster k8s-ci -- distribui a carga do Tekton entre
+    # dois workers em vez de concentrar tudo no w1 (achado em 2026-11-15:
+    # um unico worker vira gargalo de disco/memoria quando o pipeline falha
+    # e reroda varias vezes seguidas).
+    vm_id         = 2024
+    ip            = "192.168.15.73/24"
     cores         = 4
     memory        = 12288
-    disk          = 40
+    disk          = 120
     tags          = ["lab", "k8s", "env-platform-ci"]
     agent_enabled = true
     dns_servers   = ["192.168.15.65", "192.168.15.1"]
