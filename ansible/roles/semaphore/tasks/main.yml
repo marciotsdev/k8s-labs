@@ -1,0 +1,154 @@
+---
+# Instala o Semaphore UI via pacote .deb oficial (GitHub Releases), com
+# SQLite como backend (sem Postgres/MySQL -- menos pecas moveis, alinhado
+# com o footprint pequeno que o torna atrativo pro lab).
+
+- name: Aguarda o cloud-init terminar o primeiro boot
+  ansible.builtin.command: cloud-init status --wait
+  changed_when: false
+
+- name: Instala Ansible (o Semaphore so orquestra -- precisa do ansible-playbook no PATH local pra executar os templates)
+  ansible.builtin.apt:
+    name: ansible
+    state: present
+    update_cache: true
+  become: true
+
+- name: Descobre a ultima release do Semaphore no GitHub
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/ansible-semaphore/semaphore/releases/latest
+    return_content: true
+  register: semaphore_release
+  run_once: true
+  delegate_to: localhost
+  become: false
+
+- name: Define versao e nome do asset .deb (amd64)
+  ansible.builtin.set_fact:
+    semaphore_version: "{{ semaphore_release.json.tag_name | regex_replace('^v', '') }}"
+    semaphore_deb_url: >-
+      {{ (semaphore_release.json.assets
+          | selectattr('name', 'match', '.*linux_amd64\.deb$')
+          | map(attribute='browser_download_url')
+          | first) }}
+
+- name: Baixa o pacote .deb do Semaphore
+  ansible.builtin.get_url:
+    url: "{{ semaphore_deb_url }}"
+    dest: "/tmp/semaphore_{{ semaphore_version }}.deb"
+    mode: "0644"
+
+- name: Instala o pacote .deb do Semaphore
+  ansible.builtin.apt:
+    deb: "/tmp/semaphore_{{ semaphore_version }}.deb"
+  become: true
+
+- name: Garante que o diretorio de secrets existe no controlador
+  ansible.builtin.file:
+    path: "{{ semaphore_secrets_dir }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Gera as chaves de criptografia do Semaphore (uma vez so -- nao regenerar, senao sessoes/dados existentes ficam ilegiveis)
+  ansible.builtin.shell: |
+    set -e
+    for f in semaphore_cookie_hash semaphore_cookie_encryption semaphore_access_key_encryption; do
+      if [ ! -f "{{ semaphore_secrets_dir }}/$f" ]; then
+        openssl rand -base64 32 > "{{ semaphore_secrets_dir }}/$f"
+      fi
+    done
+  args:
+    creates: "{{ semaphore_secrets_dir }}/semaphore_access_key_encryption"
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Le as chaves de criptografia geradas
+  ansible.builtin.set_fact:
+    semaphore_cookie_hash: "{{ lookup('file', semaphore_secrets_dir + '/semaphore_cookie_hash') }}"
+    semaphore_cookie_encryption: "{{ lookup('file', semaphore_secrets_dir + '/semaphore_cookie_encryption') }}"
+    semaphore_access_key_encryption: "{{ lookup('file', semaphore_secrets_dir + '/semaphore_access_key_encryption') }}"
+
+- name: Cria o usuario de sistema "semaphore" (o .deb nao traz um -- so o binario)
+  ansible.builtin.user:
+    name: semaphore
+    system: true
+    shell: /usr/sbin/nologin
+    home: /var/lib/semaphore
+    create_home: false
+  become: true
+
+- name: Cria o diretorio de dados do Semaphore (SQLite + repos clonados)
+  ansible.builtin.file:
+    path: /var/lib/semaphore
+    state: directory
+    owner: semaphore
+    group: semaphore
+    mode: "0750"
+  become: true
+
+- name: Cria o diretorio de config do Semaphore
+  ansible.builtin.file:
+    path: /etc/semaphore
+    state: directory
+    owner: semaphore
+    group: semaphore
+    mode: "0750"
+  become: true
+
+- name: Gera o config.json do Semaphore (SQLite, sem Postgres/MySQL)
+  ansible.builtin.template:
+    src: config.json.j2
+    dest: /etc/semaphore/config.json
+    owner: semaphore
+    group: semaphore
+    mode: "0640"
+  become: true
+
+- name: Cria a unit systemd do Semaphore (o .deb nao traz uma)
+  ansible.builtin.template:
+    src: semaphore.service.j2
+    dest: /etc/systemd/system/semaphore.service
+    mode: "0644"
+  become: true
+  register: semaphore_unit
+
+- name: Recarrega o systemd se a unit mudou
+  ansible.builtin.systemd:
+    daemon_reload: true
+  become: true
+  when: semaphore_unit.changed
+
+- name: Para o servico antes de rodar o CLI (evita 2 processos migrando o banco ao mesmo tempo -- "duplicate column name" no SQLite)
+  ansible.builtin.systemd:
+    name: semaphore
+    state: stopped
+  become: true
+  failed_when: false
+
+- name: Cria o usuario admin do Semaphore (idempotente -- tolera "ja existe")
+  ansible.builtin.command: >-
+    semaphore user add
+    --config /etc/semaphore/config.json
+    --admin
+    --login admin
+    --name "Admin"
+    --email "{{ semaphore_admin_email }}"
+    --password "{{ semaphore_admin_password }}"
+  become: true
+  register: semaphore_admin_result
+  changed_when: semaphore_admin_result.rc == 0
+  failed_when: >-
+    semaphore_admin_result.rc != 0
+    and 'UNIQUE constraint' not in semaphore_admin_result.stderr
+    and 'already exists' not in semaphore_admin_result.stderr
+
+- name: Garante que o servico semaphore esta habilitado e rodando (so agora, depois do CLI terminar as migrations)
+  ansible.builtin.systemd:
+    name: semaphore
+    enabled: true
+    state: started
+  become: true

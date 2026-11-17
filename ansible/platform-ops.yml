@@ -1,0 +1,6 @@
+---
+# Ferramentas de "plataforma de operacao" do lab, fora de qualquer cluster
+# k3s -- hoje so o Semaphore UI (orquestracao de Ansible/Terraform via web).
+- hosts: platform_ops
+  roles:
+    - semaphore

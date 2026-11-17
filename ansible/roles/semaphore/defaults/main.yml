@@ -1,0 +1,7 @@
+---
+semaphore_secrets_dir: "{{ secrets_dir }}"
+semaphore_admin_email: "admin@lab.local"
+# Senha lida de secrets/semaphore_admin_password (gitignored) -- nunca
+# hardcoded aqui. Gerar uma vez com:
+#   openssl rand -base64 18 > secrets/semaphore_admin_password
+semaphore_admin_password: "{{ lookup('file', secrets_dir + '/semaphore_admin_password') }}"

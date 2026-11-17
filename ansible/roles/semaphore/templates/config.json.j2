@@ -1,0 +1,13 @@
+{
+  "dialect": "sqlite",
+  "sqlite": {
+    "host": "/var/lib/semaphore/semaphore.db"
+  },
+  "port": ":3000",
+  "interface": "",
+  "web_host": "http://{{ ansible_default_ipv4.address }}:3000",
+  "tmp_path": "/tmp/semaphore",
+  "cookie_hash": "{{ semaphore_cookie_hash }}",
+  "cookie_encryption": "{{ semaphore_cookie_encryption }}",
+  "access_key_encryption": "{{ semaphore_access_key_encryption }}"
+}

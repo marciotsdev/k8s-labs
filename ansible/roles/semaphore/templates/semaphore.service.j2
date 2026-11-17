@@ -1,0 +1,15 @@
+[Unit]
+Description=Semaphore UI
+After=network.target
+
+[Service]
+Type=simple
+User=semaphore
+Group=semaphore
+WorkingDirectory=/var/lib/semaphore
+ExecStart=/usr/bin/semaphore server --config /etc/semaphore/config.json
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
