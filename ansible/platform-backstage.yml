@@ -1,7 +1,8 @@
 ---
 # Cluster de plataforma separado: Backstage (depois tambem Keycloak).
-# Single-node de proposito -- recebe deploy cross-cluster disparado pelo
-# Tekton no platform-ci.
+# Deixou de ser single-node em 2026-11-17 -- 2 agents adicionados pra rodar
+# o Backstage com replicas/Rollouts de verdade. Recebe deploy cross-cluster
+# disparado pelo Tekton no platform-ci.
 - hosts: k8s_labs
   vars:
     k3s_token_file: "{{ secrets_dir }}/k3s_platform_backstage_token"
