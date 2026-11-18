@@ -107,6 +107,18 @@ spec:
         buildah run --env "$NODE_BUILD_ENV" "$ctr" -- yarn install --immutable
         buildah run --env "$NODE_BUILD_ENV" "$ctr" -- yarn build:backend
 
+        # "yarn build:backend" (backstage-cli package build) NAO gera
+        # dist/index.cjs.js direto -- gera dois tarballs (bundle.tar.gz com
+        # o codigo compilado, skeleton.tar.gz so com os package.json). O
+        # Dockerfile oficial do Backstage extrai o bundle.tar.gz depois do
+        # build; sem esse passo o entrypoint falha com "Cannot find module
+        # .../dist/index.cjs.js" (achado real em 2026-11-18, ao tentar
+        # subir o Backstage no k8s-backstage pela primeira vez). Extrai
+        # relativo ao workingdir /app -- as entradas do tar ja incluem o
+        # path "packages/backend/dist/...".
+        buildah run "$ctr" -- tar xzf packages/backend/dist/bundle.tar.gz
+        buildah run "$ctr" -- rm packages/backend/dist/bundle.tar.gz packages/backend/dist/skeleton.tar.gz
+
         # Poda as devDependencies antes de commitar a imagem -- "yarn
         # install" la em cima instala tudo (prod+dev). "yarn workspaces
         # focus --all --production" e a forma documentada do proprio
