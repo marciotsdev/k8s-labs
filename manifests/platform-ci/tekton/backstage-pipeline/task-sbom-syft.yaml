@@ -20,10 +20,13 @@ spec:
   steps:
     - name: generate-sbom
       image: anchore/syft:latest
-      script: |
-        #!/bin/sh
-        set -e
-        syft "$(params.image-url)@$(params.image-digest)" \
-          -o table \
-          -o cyclonedx-json=/tmp/sbom.cdx.json
-        echo "--- SBOM salvo em /tmp/sbom.cdx.json ($(wc -c < /tmp/sbom.cdx.json) bytes) ---"
+      # Imagem minimalista (sem /bin/sh) -- "script:" do Tekton decodifica e
+      # tenta executar via shebang, que falha com "no such file or
+      # directory" (achado real em 2026-11-19). Usa "args" direto em cima do
+      # ENTRYPOINT ["/syft"] da propria imagem, sem precisar de shell.
+      args:
+        - "$(params.image-url)@$(params.image-digest)"
+        - "-o"
+        - "table"
+        - "-o"
+        - "cyclonedx-json=/tmp/sbom.cdx.json"
