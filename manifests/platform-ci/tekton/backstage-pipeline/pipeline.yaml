@@ -1,5 +1,6 @@
 # Pipeline real do Backstage: clone -> test -> SAST -> SCA+secrets -> build ->
-# scan de imagem. O "sign" (Tekton Chains) NAO aparece aqui como Task -- o
+# scan de imagem + SBOM (em paralelo, ambos dependem so do build). O "sign"
+# (Tekton Chains) NAO aparece aqui como Task -- o
 # Chains e um controller separado que observa o TaskRun do "build" e assina
 # sozinho, ao ver os results IMAGE_URL/IMAGE_DIGEST que a nossa Task
 # build-buildah emite.
@@ -74,5 +75,12 @@ spec:
       params:
         # results emitidos pela Task "build" (buildah) -- mesmos dois nomes
         # que o Tekton Chains observa pra assinar automaticamente.
+        - { name: image-url, value: $(tasks.build.results.IMAGE_URL) }
+        - { name: image-digest, value: $(tasks.build.results.IMAGE_DIGEST) }
+
+    - name: sbom
+      taskRef: { name: sbom-syft }
+      runAfter: [build]
+      params:
         - { name: image-url, value: $(tasks.build.results.IMAGE_URL) }
         - { name: image-digest, value: $(tasks.build.results.IMAGE_DIGEST) }

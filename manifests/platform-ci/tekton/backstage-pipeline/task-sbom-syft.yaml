@@ -1,0 +1,29 @@
+# Gera o SBOM (inventario de pacotes/dependencias) da imagem ja construida --
+# mesmo padrao da image-scan: recebe IMAGE_URL/IMAGE_DIGEST dos results da
+# Task de build, escaneia o digest exato (nao so a tag). Fecha o gap de SBOM
+# identificado no fluxo de entrega (diagrama k8s-labs, 2026-11-17).
+#
+# So gera/loga o inventario -- nao bloqueia o pipeline (SBOM e inventario,
+# quem barra por vulnerabilidade e a Task image-scan). Nao ha ainda storage/
+# attestation do SBOM (ex. anexar ao registry via cosign attach) -- fica
+# como proximo passo quando fizer sentido.
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: sbom-syft
+spec:
+  params:
+    - name: image-url
+      type: string
+    - name: image-digest
+      type: string
+  steps:
+    - name: generate-sbom
+      image: anchore/syft:latest
+      script: |
+        #!/bin/sh
+        set -e
+        syft "$(params.image-url)@$(params.image-digest)" \
+          -o table \
+          -o cyclonedx-json=/tmp/sbom.cdx.json
+        echo "--- SBOM salvo em /tmp/sbom.cdx.json ($(wc -c < /tmp/sbom.cdx.json) bytes) ---"
