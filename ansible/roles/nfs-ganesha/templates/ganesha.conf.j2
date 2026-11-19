@@ -1,0 +1,20 @@
+EXPORT {
+    Export_Id = 1;
+    Path = "{{ nfs_ganesha_export_path }}";
+    Pseudo = "{{ nfs_ganesha_export_path }}";
+    Access_Type = RW;
+    Squash = No_Root_Squash;
+    SecType = "sys";
+    FSAL {
+        Name = VFS;
+    }
+    CLIENT {
+        Clients = {{ nfs_ganesha_allowed_clients }};
+    }
+}
+
+NFS_CORE_PARAM {
+    Enable_NLM = false;
+    Enable_RQUOTA = false;
+    Protocols = 4;
+}

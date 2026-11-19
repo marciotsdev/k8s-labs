@@ -1,0 +1,17 @@
+# Backend real do workspace "shared-data" do Tekton -- substitui o
+# local-path-provisioner (RWO, node-afim) que forcava todo PipelineRun a
+# ficar preso num unico node (k8s-ci-w1 fixo). Com NFS, qualquer worker
+# consegue montar o mesmo volume, liberando o scheduler padrao do k8s pra
+# balancear entre w1/w2 de verdade.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-tekton
+provisioner: nfs.csi.k8s.io
+parameters:
+  server: 192.168.15.77
+  share: /srv/nfs/tekton-workspaces
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+mountOptions:
+  - nfsvers=4.1

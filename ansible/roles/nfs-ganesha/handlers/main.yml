@@ -1,0 +1,6 @@
+---
+- name: restart nfs-ganesha
+  systemd:
+    name: nfs-ganesha
+    state: restarted
+  become: true

@@ -1,0 +1,7 @@
+---
+# VM dedicada de storage compartilhado (NFS-Ganesha) pro workspace Tekton do
+# platform-ci -- fora do cluster k3s de proposito (ver
+# terraform/platform-ci/terraform.tfvars e inventory/hosts-platform-ci.ini).
+- hosts: nfs_ganesha
+  roles:
+    - nfs-ganesha

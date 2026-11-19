@@ -19,27 +19,30 @@ spec:
       spec:
         pipelineRef:
           name: backstage-build
-        # Fixa TODOS os pods desse PipelineRun no k8s-ci-w1 -- sem isso, o
-        # PVC do workspace "shared-data" (local-path-provisioner) nasce no
-        # no do primeiro pod a usa-lo (o "clone"), que pode calhar de ser
-        # o k8s-ci-cp (control-plane, so 5.29Gi de memoria alocavel). A
-        # task build-and-push pede 8Gi de memory request -- nao cabe no cp
-        # de jeito nenhum, e o pod fica Pending pra sempre (FailedScheduling:
-        # "Insufficient memory" + "didn't match PersistentVolume's node
-        # affinity"). k8s-ci-w1 tem ~10Gi alocavel, foi redimensionado
-        # exatamente pra isso (achado em 2026-11-15).
+        # HISTORICO (ate 2026-11-19): todos os pods ficavam fixos em
+        # k8s-ci-w1 via nodeSelector de hostname -- necessario porque o
+        # workspace "shared-data" usava local-path-provisioner (RWO,
+        # node-afim: o volume nasce no node do primeiro pod a usa-lo, e
+        # todo pod seguinte da MESMA execucao precisa estar nesse mesmo
+        # node, senao fica Pending com "didn't match PersistentVolume's
+        # node affinity"). Isso deixava k8s-ci-w2 sempre ocioso (achado em
+        # 2026-11-19, avaliando onde rodar o gVisor).
+        # CORRECAO (2026-11-19): workspace migrado pra StorageClass
+        # "nfs-tekton" (NFS-Ganesha via csi-driver-nfs, VM dedicada) -- o
+        # volume passa a ser alcancavel de qualquer worker, entao o
+        # nodeSelector pode usar uma label compartilhada ("role: worker",
+        # aplicada em w1 e w2) em vez de um hostname fixo. O scheduler
+        # padrao do k8s agora decide o node por execucao, real distribuicao
+        # de carga entre os dois workers.
         # CORRECAO (2026-11-16): "podTemplate" direto no spec do PipelineRun
         # e campo antigo/descontinuado nessa versao do Tekton -- a API so
         # aceita silenciosamente (sem erro, sem warning) e ignora, porque
         # foi consolidado dentro de "taskRunTemplate" junto com
-        # serviceAccountName. O objeto real criado so tinha
-        # "taskRunTemplate: {serviceAccountName: default}", sem nodeSelector
-        # nenhum -- por isso o pod voltou a competir pelos 3 nos e ficou
-        # Pending de novo.
+        # serviceAccountName.
         taskRunTemplate:
           podTemplate:
             nodeSelector:
-              kubernetes.io/hostname: k8s-ci-w1
+              role: worker
         # gVisor (RuntimeClass "gvisor") nas Tasks que nao precisam de mount
         # privilegiado -- avaliado em 2026-11-19. build/image-scan/sbom ficam
         # de fora (build exige SYS_ADMIN, incompativel com runsc). Repete o
@@ -52,17 +55,17 @@ spec:
           - pipelineTaskName: test
             podTemplate:
               nodeSelector:
-                kubernetes.io/hostname: k8s-ci-w1
+                role: worker
               runtimeClassName: gvisor
           - pipelineTaskName: sast
             podTemplate:
               nodeSelector:
-                kubernetes.io/hostname: k8s-ci-w1
+                role: worker
               runtimeClassName: gvisor
           - pipelineTaskName: sca
             podTemplate:
               nodeSelector:
-                kubernetes.io/hostname: k8s-ci-w1
+                role: worker
               runtimeClassName: gvisor
         params:
           - name: repo-url
@@ -73,6 +76,7 @@ spec:
           - name: shared-data
             volumeClaimTemplate:
               spec:
+                storageClassName: nfs-tekton
                 accessModes: ["ReadWriteOnce"]
                 resources:
                   requests:

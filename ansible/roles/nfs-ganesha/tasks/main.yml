@@ -1,0 +1,62 @@
+---
+# VM dedicada de storage compartilhado (NFSv4 via Ganesha, FSAL VFS) --
+# resolve a causa raiz do workspace "shared-data" do Tekton ser preso a um
+# unico node do k8s-ci (local-path-provisioner e RWO node-afim). Consumido
+# pelos workers via csi-driver-nfs (ver manifests/platform-ci/storage).
+
+- name: Wait for cloud-init to finish its first-boot run
+  command: cloud-init status --wait
+  become: true
+  changed_when: false
+
+# Sem isso, o "terraform apply" espera pra sempre o guest agent reportar o
+# IP de volta -- essa VM fica fora do grupo k8s_labs (nao roda k3s-cluster,
+# que e quem instala isso nas outras VMs do lab), entao ninguem instalava
+# (achado real em 2026-11-19, apply travado em "Still creating..." por
+# mais de 10min).
+- name: Install the QEMU guest agent
+  apt:
+    name: qemu-guest-agent
+    state: present
+    update_cache: true
+  become: true
+
+- name: Ensure the guest agent is enabled and running
+  systemd:
+    name: qemu-guest-agent
+    enabled: true
+    state: started
+  become: true
+
+- name: Install NFS-Ganesha (NFSv4 userspace server, FSAL VFS backend)
+  apt:
+    name:
+      - nfs-ganesha
+      - nfs-ganesha-vfs
+    state: present
+    update_cache: true
+  become: true
+
+- name: Create the export directory
+  file:
+    path: "{{ nfs_ganesha_export_path }}"
+    state: directory
+    mode: "0777"
+    owner: nobody
+    group: nogroup
+  become: true
+
+- name: Render the Ganesha export config
+  template:
+    src: ganesha.conf.j2
+    dest: /etc/ganesha/ganesha.conf
+    mode: "0644"
+  become: true
+  notify: restart nfs-ganesha
+
+- name: Ensure nfs-ganesha is enabled and running
+  systemd:
+    name: nfs-ganesha
+    enabled: true
+    state: started
+  become: true

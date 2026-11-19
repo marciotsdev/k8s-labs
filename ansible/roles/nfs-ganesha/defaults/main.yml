@@ -1,0 +1,4 @@
+nfs_ganesha_export_path: /srv/nfs/tekton-workspaces
+# Lab fechado (rede privada 192.168.15.0/24) -- liberar so pra sub-rede do
+# lab, nao pra qualquer client.
+nfs_ganesha_allowed_clients: "192.168.15.0/24"

@@ -78,6 +78,29 @@ vms = {
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJJbotLXtaqwLd2a8vYRCOO3YbpMgIuMevYKhz9NoHJ4 root@pve",
     ]
   }
+  nfs-ganesha = {
+    # VM dedicada so pra storage compartilhado (NFS-Ganesha), consumido via
+    # csi-driver-nfs pelos workers do k8s-ci -- resolve a causa raiz do
+    # workspace "shared-data" ser preso a um unico node (local-path-
+    # provisioner e RWO node-afim). Decisao (2026-11-19): VM propria em vez
+    # de pod dentro do cluster, pra nao criar dependencia circular (se o
+    # node que hospedasse o pod do Ganesha tivesse problema, toda PVC NFS
+    # travaria junto -- ironicamente o mesmo problema que estamos resolvendo).
+    # vm_id 2028/.77: proximos livres apos platform-backstage-w2 (2027/.76).
+    vm_id         = 2028
+    ip            = "192.168.15.77/24"
+    cores         = 2
+    memory        = 2048
+    disk          = 40
+    tags          = ["lab", "env-platform-ci"]
+    agent_enabled = true
+    dns_servers   = ["192.168.15.65", "192.168.15.1"]
+    ssh_keys = [
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBO3BiGOxRN29Jfas+UGS0hV+JGKZedAl+IMpzwrzLs8 homelab-terraform-ansible",
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBogEzcV72H1vVmvC849JTMTFYguxVw5QKl4JX85fRj0 thundercat@windows-claude",
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJJbotLXtaqwLd2a8vYRCOO3YbpMgIuMevYKhz9NoHJ4 root@pve",
+    ]
+  }
 }
 
 template_vm_id = 9000
