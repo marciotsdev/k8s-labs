@@ -1,0 +1,6 @@
+mirrors:
+{% for registry in k3s_insecure_registries %}
+  "{{ registry }}":
+    endpoint:
+      - "http://{{ registry }}"
+{% endfor %}

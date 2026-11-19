@@ -1,0 +1,9 @@
+# Handler "runsc" -- precisa do runsc + containerd-shim-runsc-v1 instalados
+# e do containerd do k3s configurado (ver ansible/roles/k3s-cluster,
+# k3s_install_gvisor). So usar em Tasks sem necessidade de mount privilegiado
+# (test/sast/sca) -- build-buildah exige SYS_ADMIN/mount, incompativel.
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: gvisor
+handler: runsc

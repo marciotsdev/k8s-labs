@@ -2,3 +2,15 @@ k3s_channel: stable
 k3s_server_exec_args: "--write-kubeconfig-mode 644"
 helm_version: "v3.16.4"
 k3s_token_file: "{{ secrets_dir }}/k3s_cluster_token"
+
+# Registries HTTP (sem TLS) que o containerd do k3s deve tratar como
+# inseguros -- necessario pra qualquer cluster que faca pull de imagens do
+# Forgejo registry (ele so serve HTTP, mesmo motivo do --tls-verify=false
+# no Buildah). Lista vazia por padrao: so quem precisa (ex. platform-backstage)
+# define isso nos seus vars.
+k3s_insecure_registries: []
+
+# Instala o gVisor (runsc) e registra como runtime alternativo do containerd
+# do k3s -- desligado por padrao, so o platform-ci liga (teste de isolamento
+# extra nas Tasks test/sast/sca, avaliado em 2026-11-19).
+k3s_install_gvisor: false

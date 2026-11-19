@@ -44,6 +44,81 @@
     mode: "0755"
   become: true
 
+# O containerd do k3s tenta HTTPS por padrao em qualquer registry -- precisa
+# ser avisado explicitamente que um registry e HTTP puro, senao o pull falha
+# com "server gave HTTP response to HTTPS client" (achado real em
+# 2026-11-18, ao tentar subir o Backstage no k8s-backstage puxando do
+# Forgejo registry). So escreve o arquivo quando a lista nao esta vazia,
+# pra nao criar um registries.yaml inutil em clusters que nao precisam.
+- name: Configure insecure (HTTP) registries for containerd
+  when: k3s_insecure_registries | length > 0
+  template:
+    src: registries.yaml.j2
+    dest: /etc/rancher/k3s/registries.yaml
+    mode: "0644"
+  become: true
+  notify: "{{ 'restart k3s' if k3s_role == 'server' else 'restart k3s-agent' }}"
+
+# gVisor (runsc): runtime alternativo que roda cada pod dentro de um kernel
+# de espaco de usuario, isolando syscalls do kernel real do host. Avaliado
+# em 2026-11-19 como camada extra de isolamento pras Tasks test/sast/sca
+# (NAO compativel com a Task build-buildah, que exige SYS_ADMIN/mount
+# privilegiado -- gVisor intercepta syscalls de mount, Buildah quebraria).
+# O download direto do binario (storage.googleapis.com/.../release/latest/
+# x86_64/runsc) foi descontinuado pelo proprio projeto -- deu 404 real na
+# pratica (achado em 2026-11-19). Metodo oficial atual e via repositorio
+# APT (https://gvisor.dev/docs/user_guide/install).
+- name: Install gVisor APT prerequisites
+  when: k3s_install_gvisor | bool
+  apt:
+    name: [apt-transport-https, ca-certificates, curl, gnupg]
+    state: present
+    update_cache: true
+  become: true
+
+- name: Add the gVisor APT signing key
+  when: k3s_install_gvisor | bool
+  shell: curl -fsSL https://gvisor.dev/archive.key | gpg --dearmor -o /usr/share/keyrings/gvisor-archive-keyring.gpg
+  args:
+    creates: /usr/share/keyrings/gvisor-archive-keyring.gpg
+  become: true
+
+- name: Add the gVisor APT repository
+  when: k3s_install_gvisor | bool
+  apt_repository:
+    repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/gvisor-archive-keyring.gpg] https://storage.googleapis.com/gvisor/releases release main"
+    filename: gvisor
+    state: present
+  become: true
+
+- name: Install the runsc package (provides runsc + containerd-shim-runsc-v1)
+  when: k3s_install_gvisor | bool
+  apt:
+    name: runsc
+    state: present
+    update_cache: true
+  become: true
+
+- name: Ensure the k3s containerd config directory exists
+  when: k3s_install_gvisor | bool
+  file:
+    path: /var/lib/rancher/k3s/agent/etc/containerd
+    state: directory
+    mode: "0755"
+  become: true
+
+# "copy:" de proposito, nao "template:" -- o conteudo usa a sintaxe de Go
+# template do proprio k3s ({{ template "base" . }}), que colide com o Jinja2
+# do Ansible se processado como template.
+- name: Register gVisor (runsc) as a containerd runtime for k3s
+  when: k3s_install_gvisor | bool
+  copy:
+    src: gvisor-containerd-config.toml.tmpl
+    dest: /var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl
+    mode: "0644"
+  become: true
+  notify: "{{ 'restart k3s' if k3s_role == 'server' else 'restart k3s-agent' }}"
+
 - name: Install k3s server
   when: k3s_role == 'server'
   shell: |

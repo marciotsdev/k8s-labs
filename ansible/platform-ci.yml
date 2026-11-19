@@ -5,5 +5,9 @@
 - hosts: k8s_labs
   vars:
     k3s_token_file: "{{ secrets_dir }}/k3s_platform_ci_token"
+    # Avaliando gVisor como isolamento extra pras Tasks test/sast/sca
+    # (2026-11-19) -- NAO liga pra build-buildah, incompativel (ver
+    # k3s-cluster/tasks/main.yml).
+    k3s_install_gvisor: true
   roles:
     - k3s-cluster

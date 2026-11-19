@@ -40,6 +40,30 @@ spec:
           podTemplate:
             nodeSelector:
               kubernetes.io/hostname: k8s-ci-w1
+        # gVisor (RuntimeClass "gvisor") nas Tasks que nao precisam de mount
+        # privilegiado -- avaliado em 2026-11-19. build/image-scan/sbom ficam
+        # de fora (build exige SYS_ADMIN, incompativel com runsc). Repete o
+        # nodeSelector aqui de proposito -- taskRunSpecs.podTemplate pode nao
+        # herdar o taskRunTemplate.podTemplate de cima (mesma classe de
+        # pegadinha de campo de podTemplate silenciosamente ignorado/
+        # substituido, achado em 2026-11-16) -- confirmar apos o primeiro
+        # build real se o runtimeClassName pegou (kubectl get pod -o yaml).
+        taskRunSpecs:
+          - pipelineTaskName: test
+            podTemplate:
+              nodeSelector:
+                kubernetes.io/hostname: k8s-ci-w1
+              runtimeClassName: gvisor
+          - pipelineTaskName: sast
+            podTemplate:
+              nodeSelector:
+                kubernetes.io/hostname: k8s-ci-w1
+              runtimeClassName: gvisor
+          - pipelineTaskName: sca
+            podTemplate:
+              nodeSelector:
+                kubernetes.io/hostname: k8s-ci-w1
+              runtimeClassName: gvisor
         params:
           - name: repo-url
             value: $(tt.params.git-repo-url)
