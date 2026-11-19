@@ -7,6 +7,17 @@ metadata:
 spec:
   workspaces:
     - name: source
+  # node_modules nao precisa atravessar pod nenhum -- nem sast/sca nem build
+  # leem o que o "yarn install" daqui escreve (build faz seu proprio install
+  # de dentro do Buildah). Isolado num emptyDir (disco local do node) em vez
+  # de deixar cair no workspace NFS "source": sem isso, o yarn install
+  # escreve ~2700 pacotes/1Gi direto na rede, e o "sca" (Trivy) ainda
+  # atravessa esse node_modules de bonus ao escanear o workspace inteiro --
+  # achado real em 2026-11-19 (test levou 15min, sca deu timeout
+  # "context deadline exceeded" tentando ler ate um arquivo pequeno).
+  volumes:
+    - name: node-modules-cache
+      emptyDir: {}
   steps:
     - name: run-tests
       # node:20-slim (20.20.2) nao tem binario pre-compilado no
@@ -24,6 +35,9 @@ spec:
         # log mostrar "PASS"/"Ran all test suites".
         - name: CI
           value: "true"
+      volumeMounts:
+        - name: node-modules-cache
+          mountPath: $(workspaces.source.path)/node_modules
       script: |
         #!/bin/sh
         set -e
