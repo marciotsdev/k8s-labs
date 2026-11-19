@@ -11,6 +11,12 @@ provisioner: nfs.csi.k8s.io
 parameters:
   server: 192.168.15.77
   share: /srv/nfs/tekton-workspaces
+  # Sem isso, o csi-driver-nfs cria o subdiretorio de cada PVC com o modo
+  # default do mkdir (0755, dono root) -- os containers das Tasks do
+  # Tekton rodam como usuario nao-root e nao conseguem escrever (achado
+  # real em 2026-11-19, git-clone falhou com "Permission denied" criando
+  # .git).
+  mountPermissions: "0777"
 reclaimPolicy: Delete
 volumeBindingMode: Immediate
 mountOptions:
