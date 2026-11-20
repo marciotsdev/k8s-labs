@@ -12,6 +12,20 @@
 # salvo localmente, nao codigo nosso). Nao faz sentido "corrigir" isso, e
 # editar quebraria compatibilidade com a versao oficial. --skip-path exclui
 # esses arquivos pra o relatorio focar no que e realmente nosso.
+#
+# LIMITACAO REAL CONHECIDA (investigada em 2026-11-20): o --framework
+# terraform nunca produz nenhuma secao de resultado (nem "0 passed/0
+# failed") pro nosso Terraform. Causa raiz confirmada via debug pod +
+# "checkov -l | grep -i proxmox": ZERO resultados -- o Checkov tem um
+# catalogo de +7900 checks organizados POR PROVIDER (Azure sozinho tem
+# centenas de regras azurerm_*), e o provider que usamos (bpg/proxmox) nao
+# tem nenhuma regra propria no conjunto padrao, por ser um provider de
+# nicho/comunidade. Nao e bug nem erro de configuracao nosso -- e so
+# cobertura inexistente pro nosso provider. O scan continua rodando com
+# --framework terraform (nao custa nada deixar, e documenta a intencao),
+# mas a cobertura real de seguranca do IaC Scan hoje e so Kubernetes +
+# Ansible. Melhoria futura possivel: escrever checks customizados do
+# Checkov especificos pra Proxmox (nao feito ainda).
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
