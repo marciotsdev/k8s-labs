@@ -1,0 +1,37 @@
+# Limpeza diaria de PipelineRuns antigos -- achado em 2026-11-20: dezenas de
+# PVCs de 1Gi acumuladas (local-path e nfs-tekton), uma por PipelineRun,
+# nunca liberadas porque nada apagava os PipelineRuns depois de concluidos.
+# Mantem os 5 mais recentes de cada Pipeline (backstage-build, iac-scan),
+# apaga o resto -- a PVC do workspace vai junto via ownerReference.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: tekton-pipelinerun-pruner
+spec:
+  schedule: "0 3 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: tekton-pruner-sa
+          restartPolicy: OnFailure
+          containers:
+            - name: pruner
+              image: bitnami/kubectl:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  KEEP=5
+                  for p in backstage-build iac-scan; do
+                    names=$(kubectl get pipelinerun -n default -l tekton.dev/pipeline="$p" \
+                      --sort-by=.metadata.creationTimestamp -o name)
+                    count=$(echo "$names" | grep -c . || true)
+                    del_count=$((count - KEEP))
+                    if [ "$del_count" -gt 0 ]; then
+                      echo "$names" | head -n "$del_count" | xargs -r kubectl delete -n default
+                    else
+                      echo "Pipeline $p: $count execucoes, nada a apagar (limite $KEEP)"
+                    fi
+                  done

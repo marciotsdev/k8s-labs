@@ -1,0 +1,30 @@
+# RBAC do CronJob de limpeza de PipelineRuns antigos (ver pruner-cronjob.yaml).
+# So precisa listar/apagar PipelineRuns no namespace default -- a PVC de
+# cada workspace (volumeClaimTemplate) tem ownerReference pro PipelineRun,
+# entao apagar o PipelineRun libera a PVC junto via garbage collection
+# nativo do k8s, sem precisar de permissao extra pra PVC.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tekton-pruner-sa
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tekton-pruner-role
+rules:
+  - apiGroups: ["tekton.dev"]
+    resources: ["pipelineruns"]
+    verbs: ["get", "list", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tekton-pruner-binding
+subjects:
+  - kind: ServiceAccount
+    name: tekton-pruner-sa
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: tekton-pruner-role
