@@ -1,0 +1,36 @@
+# Pipeline do IaC Scan -- separada da pipeline do Backstage de proposito,
+# porque clona um repo diferente (k8s-labs, o proprio repo de infra, nao a
+# aplicacao). Disparada pelo mesmo EventListener do Forgejo, via um
+# Trigger proprio filtrado por nome de repo (ver eventlistener.yaml).
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: iac-scan
+spec:
+  params:
+    - name: repo-url
+      type: string
+      description: "URL do repo no Forgejo, ex: http://192.168.15.70:3000/forgejo_admin/k8s-labs.git"
+
+  workspaces:
+    - name: shared-data
+      description: "codigo clonado do k8s-labs, compartilhado entre Tasks"
+
+  tasks:
+    - name: clone
+      taskRef:
+        resolver: bundles
+        params:
+          - { name: bundle, value: "ghcr.io/tektoncd/catalog/upstream/tasks/git-clone:112374ce1262b133a77300bd8133445722605e04" }
+          - { name: name, value: git-clone }
+          - { name: kind, value: task }
+      workspaces:
+        - { name: output, workspace: shared-data }
+      params:
+        - { name: url, value: $(params.repo-url) }
+
+    - name: checkov
+      taskRef: { name: checkov-scan }
+      runAfter: [clone]
+      workspaces:
+        - { name: source, workspace: shared-data }

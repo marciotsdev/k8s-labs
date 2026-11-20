@@ -1,0 +1,35 @@
+# TriggerTemplate do IaC Scan -- reaproveita o TriggerBinding generico
+# "forgejo-push-binding" ja existente (so extrai repo-url/revision, serve
+# pra qualquer repo). Mesmo padrao de workspace NFS + balanceamento w1/w2
+# ja usado no backstage-build.
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: iac-scan-template
+spec:
+  params:
+    - name: git-repo-url
+    - name: git-revision
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        generateName: iac-scan-
+      spec:
+        pipelineRef:
+          name: iac-scan
+        taskRunTemplate:
+          podTemplate:
+            nodeSelector:
+              role: worker
+        params:
+          - { name: repo-url, value: $(tt.params.git-repo-url) }
+        workspaces:
+          - name: shared-data
+            volumeClaimTemplate:
+              spec:
+                storageClassName: nfs-tekton
+                accessModes: ["ReadWriteOnce"]
+                resources:
+                  requests:
+                    storage: 1Gi

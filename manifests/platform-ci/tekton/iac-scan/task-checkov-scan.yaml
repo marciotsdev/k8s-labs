@@ -1,0 +1,27 @@
+# Escaneia o Terraform/Ansible/manifests Kubernetes do proprio repo k8s-labs
+# por misconfiguration -- fecha o ultimo gap do modelo de referencia de
+# pipeline CI/CD (fluxo de entrega k8s-labs). Primeira execucao real roda
+# com --soft-fail de proposito: o repo nunca foi escaneado antes, e
+# bloquear o pipeline de cara com um volume desconhecido de achados nao
+# faz sentido. Decisao: ver o relatorio real primeiro, so depois decidir
+# se/como endurecer pra --hard-fail.
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: checkov-scan
+spec:
+  workspaces:
+    - name: source
+  steps:
+    - name: checkov
+      image: bridgecrew/checkov:latest
+      args:
+        - "-d"
+        - "$(workspaces.source.path)"
+        - "--framework"
+        - "terraform"
+        - "kubernetes"
+        - "ansible"
+        - "--compact"
+        - "--quiet"
+        - "--soft-fail"

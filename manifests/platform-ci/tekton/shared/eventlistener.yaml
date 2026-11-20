@@ -1,0 +1,41 @@
+# EventListener: o servico de verdade (sobe Deployment+Service) que recebe
+# o webhook. Interceptor "cel" filtra por tipo de evento, ja que nao existe
+# interceptor nativo pro Forgejo/Gitea (so github/gitlab/bitbucket/slack/cel).
+#
+# ATUALIZADO em 2026-11-20: o filtro so checava o tipo de evento (push),
+# nao QUAL repo -- um push em QUALQUER repo do Forgejo disparava o build do
+# Backstage (bug latente desde sempre, so nao dava pra perceber enquanto
+# so o repo "backstage" tinha webhook configurado pra esse listener). Achado
+# ao adicionar o k8s-labs como segundo repo com webhook -- os dois Triggers
+# agora filtram por body.repository.name tambem, cada um so reage ao seu
+# proprio repo.
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: forgejo-listener
+spec:
+  serviceAccountName: tekton-triggers-forgejo-sa
+  triggers:
+    - name: forgejo-push-trigger
+      interceptors:
+        - ref:
+            name: "cel"
+          params:
+            - name: "filter"
+              value: "header.match('X-Gitea-Event', 'push') && body.repository.name == 'backstage'"
+      bindings:
+        - ref: forgejo-push-binding
+      template:
+        ref: backstage-build-template
+
+    - name: forgejo-push-trigger-iac
+      interceptors:
+        - ref:
+            name: "cel"
+          params:
+            - name: "filter"
+              value: "header.match('X-Gitea-Event', 'push') && body.repository.name == 'k8s-labs'"
+      bindings:
+        - ref: forgejo-push-binding
+      template:
+        ref: iac-scan-template
