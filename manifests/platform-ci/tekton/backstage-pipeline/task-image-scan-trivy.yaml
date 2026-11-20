@@ -8,6 +8,17 @@
 # Agora os dois olham pra EXATAMENTE a mesma lista de componentes -- o
 # trade-off e que essa Task deixou de rodar em paralelo com a sbom (depende
 # dela agora, ver pipeline.yaml).
+#
+# RISCO ACEITO CONSCIENTEMENTE (2026-11-20): o proprio Trivy avisa em
+# runtime ("Third-party SBOM may lead to inaccurate vulnerability
+# detection... Recommend using Trivy to generate SBOMs"). Antes (paralelo),
+# Syft e Trivy enumeravam a imagem cada um por conta propria -- um ponto
+# cego do Syft na hora de montar o SBOM nao afetava o image-scan, que tinha
+# sua propria deteccao independente. Agora, o image-scan so enxerga o que
+# o Syft declarou -- herda qualquer ponto cego de enumeracao dele. Decisao
+# consciente do usuario: manter a consolidacao (ganho de nao duplicar
+# trabalho/garantir consistencia) e aceitar essa perda da "segunda opiniao"
+# independente que o desenho anterior em paralelo garantia.
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
