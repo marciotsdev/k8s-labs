@@ -1,0 +1,24 @@
+# DAST (Dynamic Application Security Testing) via OWASP ZAP baseline scan --
+# diferente de SAST/SCA/IaC Scan, precisa de um alvo HTTP rodando de
+# verdade (nao um artefato estatico), por isso vive numa Pipeline propria
+# (dast-scan), disparada manualmente -- nao faz parte do backstage-build,
+# que publica a imagem mas nao deploya (sync do Argo CD e manual).
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: zap-baseline-scan
+spec:
+  params:
+    - name: target-url
+      type: string
+      description: "URL do alvo, ex: https://backstage.lab.local"
+  steps:
+    - name: zap-baseline
+      image: ghcr.io/zaproxy/zaproxy:stable
+      script: |
+        #!/bin/sh
+        # -I: nao falha so por WARN (a maioria dos achados de um primeiro
+        # scan). Um FAIL de verdade ainda derruba o exit code -- decisao
+        # consciente de nao mascarar achado real, diferente do
+        # --soft-fail total do Checkov/Trivy nas outras Tasks.
+        zap-baseline.py -t "$(params.target-url)" -I

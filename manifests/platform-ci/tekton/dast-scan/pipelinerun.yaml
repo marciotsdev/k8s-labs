@@ -1,0 +1,20 @@
+# Template pra disparar o DAST manualmente: "kubectl create -f" (nao
+# "apply" -- usa generateName, cada disparo cria um PipelineRun novo).
+# hostAliases resolve "backstage.lab.local" dentro do Pod -- isso hoje so
+# existe no hosts do Windows do usuario, o cluster k8s-ci nao tem DNS
+# nenhum pra esse nome.
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: dast-scan-
+spec:
+  pipelineRef:
+    name: dast-scan
+  taskRunTemplate:
+    podTemplate:
+      hostAliases:
+        - ip: "192.168.15.71"
+          hostnames: ["backstage.lab.local"]
+  params:
+    - name: target-url
+      value: "https://backstage.lab.local"

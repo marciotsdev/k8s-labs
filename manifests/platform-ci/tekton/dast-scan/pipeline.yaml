@@ -1,0 +1,18 @@
+# Pipeline do DAST -- sem Task de clone de proposito, o alvo e uma URL
+# rodando de verdade (o Backstage ja deployado em k8s-backstage), nao
+# codigo-fonte. Disparo manual (ver pipelinerun.yaml) -- diferente de
+# backstage-build/iac-scan, nao reage a webhook do Forgejo, porque nao ha
+# um "push" que represente "acabei de deployar".
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: dast-scan
+spec:
+  params:
+    - name: target-url
+      type: string
+  tasks:
+    - name: zap-baseline
+      taskRef: { name: zap-baseline-scan }
+      params:
+        - { name: target-url, value: $(params.target-url) }
