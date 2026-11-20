@@ -5,6 +5,13 @@
 # bloquear o pipeline de cara com um volume desconhecido de achados nao
 # faz sentido. Decisao: ver o relatorio real primeiro, so depois decidir
 # se/como endurecer pra --hard-fail.
+#
+# ATUALIZADO em 2026-11-20: primeira execucao real mostrou que a maioria
+# dos achados era ruido de bundles de instalacao de terceiros vendorizados
+# no repo (Argo CD, Tekton -- "kubectl apply -f https://.../release.yaml"
+# salvo localmente, nao codigo nosso). Nao faz sentido "corrigir" isso, e
+# editar quebraria compatibilidade com a versao oficial. --skip-path exclui
+# esses arquivos pra o relatorio focar no que e realmente nosso.
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
@@ -15,9 +22,10 @@ spec:
   steps:
     - name: checkov
       image: bridgecrew/checkov:latest
+      workingDir: $(workspaces.source.path)
       args:
         - "-d"
-        - "$(workspaces.source.path)"
+        - "."
         - "--framework"
         - "terraform"
         - "kubernetes"
@@ -25,3 +33,13 @@ spec:
         - "--compact"
         - "--quiet"
         - "--soft-fail"
+        - "--skip-path"
+        - "manifests/platform-backstage/argocd/install\\.yaml"
+        - "--skip-path"
+        - "manifests/platform-ci/tekton/pipelines-release\\.yaml"
+        - "--skip-path"
+        - "manifests/platform-ci/tekton/triggers-release\\.yaml"
+        - "--skip-path"
+        - "manifests/platform-ci/tekton/triggers-interceptors\\.yaml"
+        - "--skip-path"
+        - "manifests/platform-ci/tekton/dashboard-release\\.yaml"
