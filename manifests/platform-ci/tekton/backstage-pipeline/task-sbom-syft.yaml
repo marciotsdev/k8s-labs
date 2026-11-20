@@ -1,12 +1,13 @@
 # Gera o SBOM (inventario de pacotes/dependencias) da imagem ja construida --
-# mesmo padrao da image-scan: recebe IMAGE_URL/IMAGE_DIGEST dos results da
-# Task de build, escaneia o digest exato (nao so a tag). Fecha o gap de SBOM
-# identificado no fluxo de entrega (diagrama k8s-labs, 2026-11-17).
+# recebe IMAGE_URL/IMAGE_DIGEST dos results da Task de build, escaneia o
+# digest exato (nao so a tag). Fecha o gap de SBOM identificado no fluxo de
+# entrega (diagrama k8s-labs, 2026-11-17).
 #
-# So gera/loga o inventario -- nao bloqueia o pipeline (SBOM e inventario,
-# quem barra por vulnerabilidade e a Task image-scan). Nao ha ainda storage/
-# attestation do SBOM (ex. anexar ao registry via cosign attach) -- fica
-# como proximo passo quando fizer sentido.
+# ATUALIZADO em 2026-11-20: o SBOM gerado aqui agora e escrito no workspace
+# compartilhado (NFS) e consumido pela Task image-scan via "trivy sbom", em
+# vez de cada Task re-enumerar os pacotes da imagem do zero de forma
+# independente (Syft aqui, Trivy la). Por isso essa Task deixou de rodar em
+# paralelo com image-scan -- agora roda ANTES dela (ver pipeline.yaml).
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
@@ -17,6 +18,8 @@ spec:
       type: string
     - name: image-digest
       type: string
+  workspaces:
+    - name: source
   steps:
     - name: generate-sbom
       image: anchore/syft:latest
@@ -29,4 +32,4 @@ spec:
         - "-o"
         - "table"
         - "-o"
-        - "cyclonedx-json=/tmp/sbom.cdx.json"
+        - "cyclonedx-json=$(workspaces.source.path)/sbom.cdx.json"

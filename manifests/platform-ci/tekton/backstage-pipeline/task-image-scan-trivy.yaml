@@ -1,16 +1,20 @@
-# Scan da imagem ja construida -- recebe IMAGE_URL/IMAGE_DIGEST como params,
-# vindos dos results da Task de build (buildah). Usar o digest (nao so a tag)
-# garante escanear exatamente a imagem que foi construida nesta execucao.
+# Scan de vulnerabilidade da imagem ja construida.
+#
+# ATUALIZADO em 2026-11-20: deixou de re-enumerar a imagem do zero via
+# "trivy image <ref>" -- agora consome o SBOM (CycloneDX) que a Task sbom
+# ja gerou e deixou no workspace compartilhado, via "trivy sbom <arquivo>".
+# Antes, Syft e Trivy enumeravam a mesma imagem de forma independente e em
+# paralelo (2x o trabalho de enumeracao, cada um com sua propria lista).
+# Agora os dois olham pra EXATAMENTE a mesma lista de componentes -- o
+# trade-off e que essa Task deixou de rodar em paralelo com a sbom (depende
+# dela agora, ver pipeline.yaml).
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: image-scan-trivy
 spec:
-  params:
-    - name: image-url
-      type: string
-    - name: image-digest
-      type: string
+  workspaces:
+    - name: source
   steps:
     - name: trivy-image-scan
       image: aquasec/trivy:latest
@@ -41,4 +45,4 @@ spec:
         # (baixado toda execucao) pode acusar CVE novo nos MESMOS pacotes
         # antigos, travando o pipeline pra sempre -- caca-lo um por um no
         # .trivyignore nao escala (achado em 2026-11-16).
-        trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --ignorefile /tmp/.trivyignore "$(params.image-url)@$(params.image-digest)"
+        trivy sbom --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --ignorefile /tmp/.trivyignore "$(workspaces.source.path)/sbom.cdx.json"

@@ -1,5 +1,6 @@
 # Pipeline real do Backstage: clone -> test -> SAST -> SCA+secrets -> build ->
-# scan de imagem + SBOM (em paralelo, ambos dependem so do build). O "sign"
+# SBOM -> scan de imagem (serial desde 2026-11-20 -- image-scan consome o
+# SBOM gerado, em vez de reenumerar a imagem em paralelo). O "sign"
 # (Tekton Chains) NAO aparece aqui como Task -- o
 # Chains e um controller separado que observa o TaskRun do "build" e assina
 # sozinho, ao ver os results IMAGE_URL/IMAGE_DIGEST que a nossa Task
@@ -69,18 +70,24 @@ spec:
       params:
         - { name: image-url, value: $(params.image-url) }
 
-    - name: image-scan
-      taskRef: { name: image-scan-trivy }
+    # ATUALIZADO em 2026-11-20: sbom roda ANTES de image-scan agora (deixou
+    # de ser paralelo) -- gera o SBOM uma unica vez no workspace
+    # compartilhado, e image-scan consome esse mesmo arquivo via
+    # "trivy sbom" em vez de re-enumerar a imagem do zero. Enumeracao unica,
+    # Syft e Trivy veem exatamente os mesmos componentes.
+    - name: sbom
+      taskRef: { name: sbom-syft }
       runAfter: [build]
+      workspaces:
+        - { name: source, workspace: shared-data }
       params:
         # results emitidos pela Task "build" (buildah) -- mesmos dois nomes
         # que o Tekton Chains observa pra assinar automaticamente.
         - { name: image-url, value: $(tasks.build.results.IMAGE_URL) }
         - { name: image-digest, value: $(tasks.build.results.IMAGE_DIGEST) }
 
-    - name: sbom
-      taskRef: { name: sbom-syft }
-      runAfter: [build]
-      params:
-        - { name: image-url, value: $(tasks.build.results.IMAGE_URL) }
-        - { name: image-digest, value: $(tasks.build.results.IMAGE_DIGEST) }
+    - name: image-scan
+      taskRef: { name: image-scan-trivy }
+      runAfter: [sbom]
+      workspaces:
+        - { name: source, workspace: shared-data }
