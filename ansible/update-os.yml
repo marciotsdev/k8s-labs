@@ -4,7 +4,15 @@
 # (nem servico, nem VM) -- so atualiza pacotes e avisa se reboot ficou
 # pendente, pra decisao manual (um k3s-agent reiniciado sem aviso no meio
 # de um pipeline rodando seria pior que o CVE que estamos corrigindo).
+#
+# serial: 1 -- adicionado em 2026-11-21: sem isso, o Ansible roda o
+# "apt upgrade" em ate 5 VMs ao mesmo tempo (fork padrao), e o I/O de disco
+# + CPU somado de varias VMs atualizando pacote ao mesmo tempo sobrecarrega
+# o host Proxmox de verdade (suspeita do usuario). Processa uma VM inteira
+# (todas as tasks) por vez antes de passar pra proxima -- mais lento no
+# total, mas nao derruba o host.
 - hosts: all_vms
+  serial: 1
   become: true
   tasks:
     - name: Atualiza o indice de pacotes
