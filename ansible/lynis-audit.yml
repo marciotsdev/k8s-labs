@@ -1,0 +1,65 @@
+---
+# Auditoria de hardening do SO (CIS-like) via Lynis, rodando direto nas 6 VMs
+# dos clusters (mesmo escopo do kube-bench, que audita a config do k3s --
+# isso aqui audita o Ubuntu embaixo: SSH, kernel, permissao de arquivo,
+# servicos expostos, etc.).
+#
+# Por que Lynis e nao OpenSCAP: OpenSCAP nao tem pacote de conteudo SCAP pro
+# Ubuntu via apt (confirmado -- so existe pra Debian, "ssg-debderived"), exigiria
+# container + Docker novo na VM do Semaphore so pra isso. Lynis e nativo do
+# Ubuntu (apt, universe, sem pacote extra), decisao consciente de usar a
+# ferramenta mais simples e nao certificada-CIS em vez da mais formal.
+#
+# Rola nativo via SSH (Ansible puro) -- diferente do kube-bench, nao precisa
+# de Job/hostPath no Kubernetes: Lynis so precisa rodar como root na propria
+# VM, sem tocar no cluster.
+#
+# Relatorio escrito em arquivo com timestamp proprio por execucao (nao
+# sobrescreve o default /var/log/lynis-report.dat) -- mesmo padrao ja usado
+# pro Checkov/kube-bench, evita depender de Ansible fetch e deixa o historico
+# acumulado no proprio host pra quem quiser auditoria mais profunda depois.
+- hosts: all_vms
+  become: true
+  tasks:
+    - name: Instala o Lynis (pacote nativo do Ubuntu, universe)
+      ansible.builtin.apt:
+        name: lynis
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Garante o diretorio de relatorios
+      ansible.builtin.file:
+        path: /var/log/lynis
+        state: directory
+        mode: "0750"
+
+    - name: Gera um timestamp pra esta execucao
+      ansible.builtin.set_fact:
+        run_ts: "{{ ansible_date_time.iso8601_basic_short }}"
+
+    # --cronjob: modo nao-interativo (sem prompt, sem cor) -- essencial rodando
+    # via Ansible/Semaphore, onde nao ha terminal pra responder "ENTER pra continuar".
+    - name: Roda o Lynis em modo auditoria (nao-interativo)
+      ansible.builtin.command:
+        cmd: >
+          lynis audit system --cronjob
+          --report-file /var/log/lynis/report-{{ inventory_hostname }}-{{ run_ts }}.dat
+          --logfile /var/log/lynis/lynis-{{ inventory_hostname }}-{{ run_ts }}.log
+      register: lynis_run
+      changed_when: true
+      failed_when: false
+
+    - name: Le o hardening index do relatorio
+      ansible.builtin.command:
+        cmd: grep -oP '^hardening_index=\K[0-9]+' /var/log/lynis/report-{{ inventory_hostname }}-{{ run_ts }}.dat
+      register: hardening_index
+      changed_when: false
+      failed_when: false
+
+    - name: Mostra o resultado de cada node
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }}: hardening index
+          {{ hardening_index.stdout | default('N/A') }}/100 --
+          relatorio completo em /var/log/lynis/report-{{ inventory_hostname }}-{{ run_ts }}.dat
