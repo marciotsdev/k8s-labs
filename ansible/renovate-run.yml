@@ -1,0 +1,51 @@
+---
+# Dispara o Job do Renovate sob demanda, via Semaphore Task Template + Schedule
+# (mesma mecanica do kube-bench-run.yml -- kubectl create job --from=cronjob).
+#
+# Diferente do kube-bench, aqui nao estamos corrigindo um buraco de confiabilidade
+# (o CronJob de hora em hora funcionava bem, cobria qualquer sessao de estudo sem
+# depender de horario fixo). O motivo da migracao é observabilidade: historico de
+# execucao visivel no Semaphore em vez de so "kubectl logs" (que ja teve bug de
+# truncagem antes, ver Checkov/kube-bench). A cadencia some do CronJob e passa a
+# viver no Schedule do proprio Semaphore -- ajustada pra 3-4h em vez de 1h, dado
+# que o lab tem no maximo 3-5 aplicacoes rodando (nao justifica checar dependencia
+# tao frequente quanto o kube-bench precisava cobrir auditoria).
+#
+# Roda contra o host "semaphore-ui" (platform_ops), reaproveitando o mesmo
+# kubectl + kubeconfig configurados em 2026-11-22 (ver [[k8s-labs]] memoria).
+- hosts: platform_ops
+  gather_facts: true
+  vars:
+    renovate_context: k8s-ci
+    renovate_cronjob: renovate
+  tasks:
+    - name: Gera um sufixo unico pra esta execucao (evita colisao de nome de Job)
+      ansible.builtin.set_fact:
+        run_ts: "{{ ansible_date_time.epoch }}"
+
+    - name: Dispara o Job a partir do CronJob do Renovate
+      ansible.builtin.command:
+        cmd: >
+          kubectl --kubeconfig {{ kubeconfig }} --context {{ renovate_context }}
+          create job --from=cronjob/{{ renovate_cronjob }} -n default
+          {{ renovate_cronjob }}-manual-{{ run_ts }}
+      changed_when: true
+
+    # Renovate pode demorar alguns minutos (clona o repo, resolve dependencias,
+    # abre PR se achar algo) -- timeout bem mais generoso que o do kube-bench.
+    - name: Espera o Job completar (ou falhar), sem derrubar o playbook
+      ansible.builtin.command:
+        cmd: >
+          kubectl --kubeconfig {{ kubeconfig }} --context {{ renovate_context }}
+          wait --for=condition=complete --timeout=900s
+          job/{{ renovate_cronjob }}-manual-{{ run_ts }} -n default
+      register: wait_result
+      failed_when: false
+      changed_when: false
+
+    - name: Mostra o resultado
+      ansible.builtin.debug:
+        msg: >-
+          {{ 'OK -- ver Forgejo (repo backstage) por PR novo de dependencia' if wait_result.rc == 0
+             else 'FALHOU ou deu timeout -- ver "kubectl --context ' + renovate_context +
+                  ' describe job/' + renovate_cronjob + '-manual-' + run_ts + '" e os logs do Pod' }}
