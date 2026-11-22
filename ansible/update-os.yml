@@ -20,9 +20,14 @@
         update_cache: true
         cache_valid_time: 3600
 
-    - name: Aplica upgrade de pacotes (so patches dentro do release atual, nao dist-upgrade)
+    # Trocado de "safe" pra "dist" em 2026-11-21, pedido explicito do
+    # usuario -- dist-upgrade pode trocar/remover pacotes pra resolver
+    # dependencias (ex: kernel novo), diferente do "safe" que nunca remove
+    # nada. Continua sem reiniciar nada sozinho -- so a task de aviso de
+    # reboot pendente abaixo muda de probabilidade, nao de comportamento.
+    - name: Aplica dist-upgrade de pacotes
       ansible.builtin.apt:
-        upgrade: safe
+        upgrade: dist
 
     - name: Remove pacotes orfaos
       ansible.builtin.apt:
