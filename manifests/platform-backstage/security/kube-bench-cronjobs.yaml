@@ -1,0 +1,148 @@
+# Mesma auditoria periodica do cluster k8s-ci (ver comentario completo em
+# manifests/platform-ci/security/kube-bench-cronjobs.yaml), aplicada aqui
+# contra os 3 nodes do k8s-backstage (cp/w1/w2). Mesma ressalva de versao:
+# perfil k3s-cis-1.24 e aproximacao, nao cobertura exata pro k3s v1.37.2+k3s1
+# (decisao de 21/11/2026).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: kube-bench-k8s-backstage-cp
+  namespace: default
+spec:
+  schedule: "0 3 * * 0"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          hostPID: true
+          nodeSelector:
+            kubernetes.io/hostname: k8s-backstage-cp
+          restartPolicy: Never
+          containers:
+            - name: kube-bench
+              image: aquasec/kube-bench:v0.16.0
+              command:
+                - sh
+                - -c
+                - |
+                  mkdir -p /var/log/kube-bench
+                  kube-bench run --benchmark k3s-cis-1.24 2>&1 | \
+                    tee "/var/log/kube-bench/report-k8s-backstage-cp-$(date +%Y%m%d-%H%M%S).txt"
+              volumeMounts:
+                - { name: var-lib-etcd, mountPath: /var/lib/etcd, readOnly: true }
+                - { name: etc-systemd, mountPath: /etc/systemd, readOnly: true }
+                - { name: var-lib-kubelet, mountPath: /var/lib/kubelet, readOnly: true }
+                - { name: etc-kubernetes, mountPath: /etc/kubernetes, readOnly: true }
+                - { name: etc-rancher, mountPath: /etc/rancher, readOnly: true }
+                - { name: var-lib-rancher, mountPath: /var/lib/rancher, readOnly: true }
+                - { name: usr-bin, mountPath: /usr/local/mount-from-host/bin, readOnly: true }
+                - { name: var-log-kube-bench, mountPath: /var/log/kube-bench }
+          volumes:
+            - { name: var-lib-etcd, hostPath: { path: /var/lib/etcd } }
+            - { name: etc-systemd, hostPath: { path: /etc/systemd } }
+            - { name: var-lib-kubelet, hostPath: { path: /var/lib/kubelet } }
+            - { name: etc-kubernetes, hostPath: { path: /etc/kubernetes } }
+            - { name: etc-rancher, hostPath: { path: /etc/rancher } }
+            - { name: var-lib-rancher, hostPath: { path: /var/lib/rancher } }
+            - { name: usr-bin, hostPath: { path: /usr/bin } }
+            - { name: var-log-kube-bench, hostPath: { path: /var/log/kube-bench, type: DirectoryOrCreate } }
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: kube-bench-k8s-backstage-w1
+  namespace: default
+spec:
+  schedule: "10 3 * * 0"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          hostPID: true
+          nodeSelector:
+            kubernetes.io/hostname: k8s-backstage-w1
+          restartPolicy: Never
+          containers:
+            - name: kube-bench
+              image: aquasec/kube-bench:v0.16.0
+              command:
+                - sh
+                - -c
+                - |
+                  mkdir -p /var/log/kube-bench
+                  kube-bench run --benchmark k3s-cis-1.24 2>&1 | \
+                    tee "/var/log/kube-bench/report-k8s-backstage-w1-$(date +%Y%m%d-%H%M%S).txt"
+              volumeMounts:
+                - { name: var-lib-etcd, mountPath: /var/lib/etcd, readOnly: true }
+                - { name: etc-systemd, mountPath: /etc/systemd, readOnly: true }
+                - { name: var-lib-kubelet, mountPath: /var/lib/kubelet, readOnly: true }
+                - { name: etc-kubernetes, mountPath: /etc/kubernetes, readOnly: true }
+                - { name: etc-rancher, mountPath: /etc/rancher, readOnly: true }
+                - { name: var-lib-rancher, mountPath: /var/lib/rancher, readOnly: true }
+                - { name: usr-bin, mountPath: /usr/local/mount-from-host/bin, readOnly: true }
+                - { name: var-log-kube-bench, mountPath: /var/log/kube-bench }
+          volumes:
+            - { name: var-lib-etcd, hostPath: { path: /var/lib/etcd } }
+            - { name: etc-systemd, hostPath: { path: /etc/systemd } }
+            - { name: var-lib-kubelet, hostPath: { path: /var/lib/kubelet } }
+            - { name: etc-kubernetes, hostPath: { path: /etc/kubernetes } }
+            - { name: etc-rancher, hostPath: { path: /etc/rancher } }
+            - { name: var-lib-rancher, hostPath: { path: /var/lib/rancher } }
+            - { name: usr-bin, hostPath: { path: /usr/bin } }
+            - { name: var-log-kube-bench, hostPath: { path: /var/log/kube-bench, type: DirectoryOrCreate } }
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: kube-bench-k8s-backstage-w2
+  namespace: default
+spec:
+  schedule: "20 3 * * 0"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          hostPID: true
+          nodeSelector:
+            kubernetes.io/hostname: k8s-backstage-w2
+          restartPolicy: Never
+          containers:
+            - name: kube-bench
+              image: aquasec/kube-bench:v0.16.0
+              command:
+                - sh
+                - -c
+                - |
+                  mkdir -p /var/log/kube-bench
+                  kube-bench run --benchmark k3s-cis-1.24 2>&1 | \
+                    tee "/var/log/kube-bench/report-k8s-backstage-w2-$(date +%Y%m%d-%H%M%S).txt"
+              volumeMounts:
+                - { name: var-lib-etcd, mountPath: /var/lib/etcd, readOnly: true }
+                - { name: etc-systemd, mountPath: /etc/systemd, readOnly: true }
+                - { name: var-lib-kubelet, mountPath: /var/lib/kubelet, readOnly: true }
+                - { name: etc-kubernetes, mountPath: /etc/kubernetes, readOnly: true }
+                - { name: etc-rancher, mountPath: /etc/rancher, readOnly: true }
+                - { name: var-lib-rancher, mountPath: /var/lib/rancher, readOnly: true }
+                - { name: usr-bin, mountPath: /usr/local/mount-from-host/bin, readOnly: true }
+                - { name: var-log-kube-bench, mountPath: /var/log/kube-bench }
+          volumes:
+            - { name: var-lib-etcd, hostPath: { path: /var/lib/etcd } }
+            - { name: etc-systemd, hostPath: { path: /etc/systemd } }
+            - { name: var-lib-kubelet, hostPath: { path: /var/lib/kubelet } }
+            - { name: etc-kubernetes, hostPath: { path: /etc/kubernetes } }
+            - { name: etc-rancher, hostPath: { path: /etc/rancher } }
+            - { name: var-lib-rancher, hostPath: { path: /var/lib/rancher } }
+            - { name: usr-bin, hostPath: { path: /usr/bin } }
+            - { name: var-log-kube-bench, hostPath: { path: /var/log/kube-bench, type: DirectoryOrCreate } }

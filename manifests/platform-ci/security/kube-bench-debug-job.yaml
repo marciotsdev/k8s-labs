@@ -1,0 +1,66 @@
+# Execucao UNICA de validacao -- nao e o CronJob final. Objetivo: descobrir
+# com output real quais hostPath o profile k3s-cis-1.24 realmente precisa
+# antes de generalizar pros 6 nodes (k8s-ci + k8s-backstage).
+#
+# RESSALVA DE VERSAO (confirmada via pesquisa em 21/11/2026): k3s-cis-1.24 e
+# o perfil mais novo que o kube-bench v0.16.0 oferece pro k3s -- mapeado
+# oficialmente so ate k3s v1.29-v1.32 (docs/platforms.md do projeto). Nao
+# existe perfil para k3s v1.37.2+k3s1 (versao real deste cluster). Resultado
+# e a melhor aproximacao disponivel, nao uma cobertura exata -- aceito
+# conscientemente dado o caracter de estudo/evolucao do ambiente.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kube-bench-debug
+  namespace: default
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      hostPID: true
+      nodeSelector:
+        kubernetes.io/hostname: k8s-ci-cp
+      restartPolicy: Never
+      containers:
+        - name: kube-bench
+          # Pinado na versao que validamos ter o k3s-cis-1.24 -- uma versao
+          # futura pode remover ou alterar esse profile silenciosamente.
+          image: aquasec/kube-bench:v0.16.0
+          command: ["kube-bench", "run", "--benchmark", "k3s-cis-1.24"]
+          volumeMounts:
+            - name: var-lib-etcd
+              mountPath: /var/lib/etcd
+              readOnly: true
+            - name: etc-systemd
+              mountPath: /etc/systemd
+              readOnly: true
+            - name: var-lib-kubelet
+              mountPath: /var/lib/kubelet
+              readOnly: true
+            - name: etc-kubernetes
+              mountPath: /etc/kubernetes
+              readOnly: true
+            - name: etc-rancher
+              mountPath: /etc/rancher
+              readOnly: true
+            - name: var-lib-rancher
+              mountPath: /var/lib/rancher
+              readOnly: true
+            - name: usr-bin
+              mountPath: /usr/local/mount-from-host/bin
+              readOnly: true
+      volumes:
+        - name: var-lib-etcd
+          hostPath: { path: /var/lib/etcd }
+        - name: etc-systemd
+          hostPath: { path: /etc/systemd }
+        - name: var-lib-kubelet
+          hostPath: { path: /var/lib/kubelet }
+        - name: etc-kubernetes
+          hostPath: { path: /etc/kubernetes }
+        - name: etc-rancher
+          hostPath: { path: /etc/rancher }
+        - name: var-lib-rancher
+          hostPath: { path: /var/lib/rancher }
+        - name: usr-bin
+          hostPath: { path: /usr/bin }
