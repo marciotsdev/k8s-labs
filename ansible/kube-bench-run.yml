@@ -1,0 +1,69 @@
+---
+# Dispara os 6 Jobs de kube-bench (CIS Benchmark) sob demanda, um por node dos
+# clusters k8s-ci e k8s-backstage, via Semaphore Task Template (mesmo padrao do
+# update-os.yml: roda pela interface web ou pelo terminal).
+#
+# Por que isso existe: os 6 CronJobs (ver manifests/platform-ci/security e
+# manifests/platform-backstage/security) nao cobrem execucoes perdidas quando o
+# Proxmox esta desligado no horario agendado -- CronJob do k8s nao "recupera"
+# por padrao, so dispara dentro de uma janela curta (startingDeadlineSeconds).
+# Como o host so fica ligado durante sessao de estudo, a maioria dos agendamentos
+# semanais nunca dispara de verdade. Disparo manual sob demanda resolve isso,
+# mesmo raciocinio ja aplicado ao Renovate (schedule de hora em hora) e ao
+# update-os.yml (rodado via Semaphore, nao cron).
+#
+# Roda contra o host "semaphore-ui" (platform_ops) via SSH, usando o kubectl +
+# kubeconfig instalados la em 2026-11-22 (ver [[k8s-labs]] memoria) -- os dois
+# contexts (k8s-ci, k8s-backstage) ja estao configurados em
+# /home/ubuntu/.kube/config (variavel "kubeconfig" em group_vars/all.yml).
+#
+# Validado manualmente (ansible-playbook direto, fora do Semaphore) antes de
+# suspender os 6 CronJobs -- modelo hands-on do projeto: nao desliga a rede de
+# seguranca (CronJob) ate confirmar que o caminho novo funciona de ponta a ponta.
+- hosts: platform_ops
+  gather_facts: true
+  vars:
+    kube_bench_jobs:
+      - { context: k8s-ci, cronjob: kube-bench-k8s-ci-cp }
+      - { context: k8s-ci, cronjob: kube-bench-k8s-ci-w1 }
+      - { context: k8s-ci, cronjob: kube-bench-k8s-ci-w2 }
+      - { context: k8s-backstage, cronjob: kube-bench-k8s-backstage-cp }
+      - { context: k8s-backstage, cronjob: kube-bench-k8s-backstage-w1 }
+      - { context: k8s-backstage, cronjob: kube-bench-k8s-backstage-w2 }
+  tasks:
+    - name: Gera um sufixo unico pra esta execucao (evita colisao de nome de Job)
+      ansible.builtin.set_fact:
+        run_ts: "{{ ansible_date_time.epoch }}"
+
+    - name: Dispara um Job a partir de cada CronJob (kubectl create job --from=cronjob)
+      ansible.builtin.command:
+        cmd: >
+          kubectl --kubeconfig {{ kubeconfig }} --context {{ item.context }}
+          create job --from=cronjob/{{ item.cronjob }} -n default
+          {{ item.cronjob }}-manual-{{ run_ts }}
+      loop: "{{ kube_bench_jobs }}"
+      changed_when: true
+
+    # kube-bench roda rapido (segundos), mas o timeout é generoso pra nao falhar
+    # por variacao de carga do host Proxmox.
+    - name: Espera cada Job completar (ou falhar), sem derrubar o playbook inteiro
+      ansible.builtin.command:
+        cmd: >
+          kubectl --kubeconfig {{ kubeconfig }} --context {{ item.context }}
+          wait --for=condition=complete --timeout=300s
+          job/{{ item.cronjob }}-manual-{{ run_ts }} -n default
+      loop: "{{ kube_bench_jobs }}"
+      register: wait_result
+      failed_when: false
+      changed_when: false
+
+    - name: Mostra o resultado de cada node
+      ansible.builtin.debug:
+        msg: >-
+          {{ item.item.cronjob }}:
+          {{ 'OK -- relatorio em /var/log/kube-bench/ no node' if item.rc == 0
+             else 'FALHOU ou deu timeout -- ver "kubectl --context ' + item.item.context +
+                  ' describe job/' + item.item.cronjob + '-manual-' + run_ts + '"' }}
+      loop: "{{ wait_result.results }}"
+      loop_control:
+        label: "{{ item.item.cronjob }}"
