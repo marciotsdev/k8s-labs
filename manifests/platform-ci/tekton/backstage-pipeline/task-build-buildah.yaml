@@ -9,6 +9,22 @@
 # Emite IMAGE_URL/IMAGE_DIGEST (convencao que o Tekton Chains observa) --
 # ele assina a imagem sozinho ao ver esses 2 results, sem Task explicita
 # de "sign" no Pipeline.
+#
+# AVALIADO e NAO implementado (2026-11-21), duas alternativas de patch de
+# imagem, com motivo registrado:
+# - Copacetic: patcheia imagem ja publicada sem rebuild. Baixo ganho real
+#   aqui -- toda imagem ja e rebuildada do zero a cada push, e o
+#   "apt-get upgrade" logo abaixo ja cobre a mesma superficie (CVE de SO
+#   com fix disponivel). Os CVEs que sobram no scan (will_not_fix,
+#   dependencias vendorizadas tipo tinypool) nao teriam fix nem via
+#   Copacetic -- mesma limitacao do apt upgrade.
+# - Chainguard/Wolfi (imagem base zero-CVE): reduziria CVE de SO na raiz,
+#   mas exige reescrever esta Task como multi-stage (variante "-dev" pra
+#   compilar, copiar artefato pra imagem minima) e troca glibc (Debian,
+#   usado hoje) por musl (Wolfi) -- risco real de reabrir o problema de
+#   modulo nativo (better-sqlite3/ssh2/cpu-features) ja resolvido em
+#   2026-11-11 na troca node:20-slim -> node:22-bookworm-slim. Camada
+#   gratis tambem so da tag "latest", sem fixar versao.
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
