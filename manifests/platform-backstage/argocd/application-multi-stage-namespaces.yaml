@@ -1,0 +1,21 @@
+# Primeiro pedaco do plano de multi-stage (dev/qa/stage/prod) -- so os 4
+# namespaces em si, segregados por label k8s-labs.io/stage. Deploy do
+# Backstage+Postgres por namespace e as Claims do Crossplane por estagio
+# vem depois, uma vez que o Crossplane em si estiver instalado (stage 18).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: multi-stage-namespaces
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: http://192.168.15.70:3000/forgejo_admin/gitops-manifests.git
+    targetRevision: main
+    path: platform/multi-stage/namespaces
+  destination:
+    server: https://kubernetes.default.svc
+    # Namespace objects sao cluster-scoped -- esse campo nao se aplica a eles,
+    # mas o Argo CD exige um valor nao-vazio.
+    namespace: default
+  syncPolicy: {}
