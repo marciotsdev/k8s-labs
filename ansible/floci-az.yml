@@ -1,0 +1,8 @@
+---
+# Sobe o floci-az (emulador local de Azure) na VM dedicada (fora do k3s).
+# Criado em 2026-11-23 -- VM separada do MiniStack de proposito (nao
+# acoplar blast radius de dois emuladores de nuvem diferentes), rodando no
+# storage novo data02-thin (nao no pve/local-lvm, ja sob pressao).
+- hosts: floci_az
+  roles:
+    - floci-az

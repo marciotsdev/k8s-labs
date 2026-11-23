@@ -1,0 +1,45 @@
+---
+- name: Install docker
+  apt:
+    name:
+      - docker.io
+      - docker-compose-v2
+    state: present
+    update_cache: true
+  become: true
+
+- name: Ensure docker is enabled and running
+  systemd:
+    name: docker
+    enabled: true
+    state: started
+  become: true
+
+- name: Create floci-az stack directory
+  file:
+    path: "{{ floci_az_dir }}"
+    state: directory
+    mode: "0755"
+  become: true
+
+- name: Template docker-compose.yml
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ floci_az_dir }}/docker-compose.yml"
+    mode: "0644"
+  become: true
+
+- name: Start floci-az
+  command: docker compose -f {{ floci_az_dir }}/docker-compose.yml up -d
+  become: true
+  register: floci_az_compose_up
+  changed_when: "'Started' in floci_az_compose_up.stderr or 'Created' in floci_az_compose_up.stderr or 'Recreated' in floci_az_compose_up.stderr"
+
+# Nao achei um endpoint de health documentado tipo /_ministack/health do
+# MiniStack (so o console web em /_floci/ui) -- espera a porta abrir em vez
+# de assumir um path que nao confirmei que existe.
+- name: Wait for floci-az to accept connections
+  wait_for:
+    host: "{{ ansible_default_ipv4.address }}"
+    port: "{{ floci_az_port }}"
+    timeout: 60

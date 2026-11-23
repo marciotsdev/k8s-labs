@@ -1,0 +1,12 @@
+services:
+  floci-az:
+    image: {{ floci_az_image }}
+    container_name: floci-az
+    restart: unless-stopped
+    ports:
+      - '{{ floci_az_port }}:4577'
+    volumes:
+      # Necessario pro Azure Functions e outros servicos baseados em
+      # container (ex.: AKS, Container Instances) -- sem isso eles nao
+      # funcionam, segundo o README oficial.
+      - /var/run/docker.sock:/var/run/docker.sock

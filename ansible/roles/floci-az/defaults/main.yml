@@ -1,0 +1,6 @@
+# floci-az — emulador local de Azure (MIT, floci-io/floci-az), decisao de
+# 2026-11-23 -- avaliado contra o LocalStack for Azure (sem Front Door, mas
+# grátis de verdade, sem teto de receita, diferente do Topaz/LocalStack).
+floci_az_image: "floci/floci-az:latest"
+floci_az_port: 4577
+floci_az_dir: /opt/floci-az
