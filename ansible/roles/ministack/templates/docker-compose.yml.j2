@@ -1,0 +1,23 @@
+services:
+  ministack:
+    image: {{ ministack_image }}
+    container_name: ministack
+    restart: unless-stopped
+    ports:
+      - '{{ ministack_port }}:4566'
+    volumes:
+      # Infra "real": RDS sobe Postgres, ElastiCache sobe Redis, ECS sobe containers.
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  stackport:
+    image: {{ stackport_image }}
+    container_name: stackport
+    restart: unless-stopped
+    depends_on:
+      - ministack
+    ports:
+      - '{{ stackport_port }}:8080'
+    environment:
+      # Container irmao: o localhost do stackport nao e o do ministack.
+      AWS_ENDPOINT_URL: "http://ministack:4566"
+      AWS_REGION: us-east-1

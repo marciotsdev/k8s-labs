@@ -1,0 +1,10 @@
+# MiniStack — emulador AWS local (MIT). Portado do homelab-iac
+# (marciotsdev/homelab-iac, destruido em 2026-10-28, codigo preservado como
+# portfolio) -- recriado em 2026-11-23 pra validar Crossplane provisionando
+# infra de tamanhos diferentes por estagio (dev/qa/stage/prod).
+ministack_image: "ministackorg/ministack"
+ministack_port: 4566
+ministack_dir: /opt/ministack
+# StackPort — browser web de recursos (S3, DynamoDB, Lambda, SQS, IAM, EC2...).
+stackport_image: "davireis/stackport"
+stackport_port: 8080

@@ -1,0 +1,46 @@
+---
+- name: Install docker
+  apt:
+    name:
+      - docker.io
+      - docker-compose-v2
+    state: present
+    update_cache: true
+  become: true
+
+- name: Ensure docker is enabled and running
+  systemd:
+    name: docker
+    enabled: true
+    state: started
+  become: true
+
+- name: Create MiniStack stack directory
+  file:
+    path: "{{ ministack_dir }}"
+    state: directory
+    mode: "0755"
+  become: true
+
+- name: Template docker-compose.yml
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ ministack_dir }}/docker-compose.yml"
+    mode: "0644"
+  become: true
+
+- name: Start MiniStack and StackPort
+  command: docker compose -f {{ ministack_dir }}/docker-compose.yml up -d
+  become: true
+  register: ministack_compose_up
+  changed_when: "'Started' in ministack_compose_up.stderr or 'Created' in ministack_compose_up.stderr or 'Recreated' in ministack_compose_up.stderr"
+
+- name: Wait for MiniStack to be healthy
+  uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ ministack_port }}/_ministack/health"
+    status_code: 200
+  register: ministack_ready
+  retries: 20
+  delay: 5
+  until: ministack_ready is succeeded
+  changed_when: false

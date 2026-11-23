@@ -1,0 +1,8 @@
+---
+# Sobe o MiniStack + StackPort na VM dedicada (fora do k3s). Recriado em
+# 2026-11-23 -- ver comentario em terraform/ministack/terraform.tfvars pro
+# contexto completo (validar Crossplane com infra de tamanhos diferentes
+# por estagio dev/qa/stage/prod).
+- hosts: ministack
+  roles:
+    - ministack
