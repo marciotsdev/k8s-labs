@@ -1,0 +1,46 @@
+# CR da nova API declarativa do Image Updater v1.5 (ver install.yaml) --
+# monitora a imagem do backstage no registry do Forgejo e, ao detectar um
+# digest novo por tras da tag fixa ":latest" (o Tekton nunca publica outra
+# tag -- ver task-build-buildah.yaml), escreve o override de imagem direto no
+# kustomization.yaml do gitops-manifests via git (write-back method
+# "git:secret:image-updater-git-creds" -- credencial dedicada, NAO reaproveita
+# o repo-credential do proprio Argo CD nem o token do renovate-bot, que e
+# escopado so pro repo backstage).
+#
+# Repository em SSH (porta 2222 do Forgejo), nao em http:// -- achado em
+# 2026-11-23: o codigo de resolucao de credenciais do write-back (gitcreds.go,
+# metodo git:secret:) so reconhece https:// ou ssh, nunca http:// puro, e cai
+# em "unknown repository type" com o Forgejo deste lab (que nao tem TLS).
+# SSH tambem casa com o padrao de chave ed25519 ja usado em todo o projeto
+# (ver ssh_keys nos tfvars). Chave publica do bot "argocd-image-updater"
+# precisa estar cadastrada como Deploy Key (com escrita) no repo
+# gitops-manifests no Forgejo -- ver secrets/argocd_image_updater_ssh_key.pub.
+#
+# updateStrategy "digest" em vez de semver/newest-build: so faz sentido
+# porque a tag nunca muda de nome, so o conteudo por tras dela.
+apiVersion: argocd-image-updater.argoproj.io/v1alpha1
+kind: ImageUpdater
+metadata:
+  name: backstage
+  namespace: argocd
+spec:
+  applicationRefs:
+    - namePattern: backstage
+      images:
+        - alias: backstage
+          imageName: 192.168.15.70:3000/forgejo_admin/backstage:latest
+          commonUpdateSettings:
+            updateStrategy: digest
+          manifestTargets:
+            kustomize:
+              name: 192.168.15.70:3000/forgejo_admin/backstage
+      writeBackConfig:
+        method: git:secret:image-updater-git-creds
+        gitConfig:
+          repository: ssh://git@192.168.15.70:2222/forgejo_admin/gitops-manifests.git
+          branch: main
+          # Path relativo ao spec.source.path da Application (apps/backstage/base) --
+          # o controller ja resolve a partir dali; repetir o path aqui duplica
+          # (achado em 2026-11-23: "could not find kustomization in
+          # .../apps/backstage/base/apps/backstage/base").
+          writeBackTarget: "kustomization:."
