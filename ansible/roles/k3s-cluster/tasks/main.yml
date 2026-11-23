@@ -59,6 +59,25 @@
   become: true
   notify: "{{ 'restart k3s' if k3s_role == 'server' else 'restart k3s-agent' }}"
 
+# flannel-backend/disable-network-policy sao flags so do server -- agents nao
+# tem esse arquivo. Achado em 2026-11-23 (migracao Flannel->Cilium no
+# platform-backstage): desligar o Flannel aqui NAO remove a interface
+# flannel.1/cni0 ja existente num cluster ja instalado -- isso precisa ser
+# limpo manualmente (ip link delete) antes do CNI novo conseguir subir. Esse
+# role so cobre a config do k3s em si, nao a limpeza de interface nem a
+# instalacao do CNI novo (isso fica pro playbook/comando especifico de cada
+# migracao).
+- name: Configure CNI backend (flannel-backend / disable-network-policy)
+  when: >
+    k3s_role == 'server' and
+    (k3s_flannel_backend | length > 0 or k3s_disable_network_policy | bool)
+  template:
+    src: config.yaml.j2
+    dest: /etc/rancher/k3s/config.yaml
+    mode: "0644"
+  become: true
+  notify: "restart k3s"
+
 # gVisor (runsc): runtime alternativo que roda cada pod dentro de um kernel
 # de espaco de usuario, isolando syscalls do kernel real do host. Avaliado
 # em 2026-11-19 como camada extra de isolamento pras Tasks test/sast/sca

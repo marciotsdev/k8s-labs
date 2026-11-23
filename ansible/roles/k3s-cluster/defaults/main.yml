@@ -14,3 +14,16 @@ k3s_insecure_registries: []
 # do k3s -- desligado por padrao, so o platform-ci liga (teste de isolamento
 # extra nas Tasks test/sast/sca, avaliado em 2026-11-19).
 k3s_install_gvisor: false
+
+# CNI do cluster -- vazio mantem o Flannel embarcado do k3s (comportamento
+# padrao, usado por k8s-ci/k8s-labs/platform-ops). "none" desliga o Flannel
+# pra instalar outro CNI por fora (Cilium, por exemplo) via Helm -- feito
+# ao vivo no platform-backstage em 2026-11-23 pra viabilizar NetworkPolicy
+# de verdade (Flannel nao tem motor de politica nenhum). Nesse caso,
+# tambem desligar o controlador de NetworkPolicy proprio do k3s
+# (k3s_disable_network_policy), senao ele compete com o do CNI novo.
+# So escreve /etc/rancher/k3s/config.yaml quando pelo menos um dos dois
+# estiver setado, pra nao criar um arquivo inutil nos clusters que nao
+# precisam -- mesmo padrao do registries.yaml acima.
+k3s_flannel_backend: ""
+k3s_disable_network_policy: false
