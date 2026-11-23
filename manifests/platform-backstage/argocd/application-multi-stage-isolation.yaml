@@ -1,0 +1,22 @@
+# Isolamento real de multi-tenancy por estagio (ResourceQuota + LimitRange +
+# NetworkPolicy) -- so faz efeito de verdade porque o cluster roda Cilium
+# desde 2026-11-23 (ver memoria k8s-labs, secao da migracao Flannel->Cilium).
+# Depende da Application multi-stage-namespaces ja ter sincronizado antes
+# (os namespaces dev/qa/stage/prod precisam existir).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: multi-stage-isolation
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: http://192.168.15.70:3000/forgejo_admin/gitops-manifests.git
+    targetRevision: main
+    path: platform/multi-stage/isolation
+  destination:
+    server: https://kubernetes.default.svc
+    # ResourceQuota/LimitRange/NetworkPolicy sao namespaced, mas cada arquivo
+    # ja declara seu proprio namespace -- esse campo e so formalidade.
+    namespace: default
+  syncPolicy: {}
