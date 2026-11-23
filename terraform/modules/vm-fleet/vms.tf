@@ -36,6 +36,14 @@ resource "proxmox_virtual_environment_vm" "this" {
     datastore_id = coalesce(each.value.datastore_id, var.datastore_id)
     interface    = each.value.disk_interface
     size         = each.value.disk
+    # "ignore" (default do provider) nunca repassa TRIM do guest pro pool
+    # thin do Proxmox -- dado apagado dentro da VM fica preso como bloco
+    # "alocado" pra sempre, mesmo sem uso real. Isso encheu o local-lvm de
+    # verdade (100% de dados reais) e derrubou 3 VMs com io-error em
+    # 2026-11-23 (achado no k8s-ci-w1, que acumulava builds do Buildah).
+    # "on" repassa o TRIM -- ainda assim precisa rodar `fstrim` (ou ter
+    # fstrim.timer ativo) dentro do guest pra devolver o espaço de verdade.
+    discard = "on"
   }
 
   network_device {
