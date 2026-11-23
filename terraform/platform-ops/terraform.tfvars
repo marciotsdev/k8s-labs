@@ -14,6 +14,9 @@ vms = {
     cores         = 2
     memory        = 4096
     disk          = 40
+    # Migrado pro data02-thin em 2026-11-23 -- junta com os utilitarios
+    # leves nesse pool, fora do pve.
+    datastore_id  = "data02-thin"
     tags          = ["lab", "ops"]
     agent_enabled = true
     dns_servers   = ["192.168.15.65", "192.168.15.1"]

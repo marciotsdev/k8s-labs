@@ -21,6 +21,11 @@ vms = {
     # encheram o disco de verdade (achado em 2026-11-12, kubelet evictando
     # pod por ephemeral-storage).
     disk          = 80
+    # Migrado pro data02-thin em 2026-11-23 -- era um dos dois que mais
+    # pesavam no pool pve (~61GB reais de 80GB nominal), ver [[k8s-labs]]
+    # memoria, incidente do pool cheio. Mecanismo (move de disco ao vivo,
+    # update in-place, sem downtime) ja validado antes no nfs-ganesha.
+    datastore_id  = "data02-thin"
     tags          = ["lab", "k8s", "env-platform-ci"]
     agent_enabled = true
     dns_servers   = ["192.168.15.65", "192.168.15.1"]
@@ -50,6 +55,9 @@ vms = {
     # de uma vez (achado em 2026-11-15, "Inode bitmap checksum does not
     # match bitmap"). VM recriada do zero com o valor certo.
     disk          = 120
+    # Migrado pro data02-thin em 2026-11-23 -- completa o cluster k8s-ci
+    # inteiro no mesmo pool (cp/w2 ja migrados antes).
+    datastore_id  = "data02-thin"
     tags          = ["lab", "k8s", "env-platform-ci"]
     agent_enabled = true
     dns_servers   = ["192.168.15.65", "192.168.15.1"]
@@ -69,6 +77,9 @@ vms = {
     cores         = 4
     memory        = 12288
     disk          = 120
+    # Migrado pro data02-thin em 2026-11-23 -- o outro que mais pesava no
+    # pool pve (~59GB reais de 120GB nominal), junto com o k8s-ci-cp acima.
+    datastore_id  = "data02-thin"
     tags          = ["lab", "k8s", "env-platform-ci"]
     agent_enabled = true
     dns_servers   = ["192.168.15.65", "192.168.15.1"]
@@ -92,6 +103,11 @@ vms = {
     cores         = 2
     memory        = 2048
     disk          = 40
+    # TESTE em 2026-11-23: datastore_id trocado de local-lvm (default) pra
+    # data02-thin, só pra ver via `terraform plan` se o provider trata isso
+    # como update in-place (move de disco ao vivo) ou force replacement
+    # (destroi e recria a VM) -- NAO aplicar sem confirmar qual dos dois.
+    datastore_id  = "data02-thin"
     tags          = ["lab", "env-platform-ci"]
     agent_enabled = true
     dns_servers   = ["192.168.15.65", "192.168.15.1"]
