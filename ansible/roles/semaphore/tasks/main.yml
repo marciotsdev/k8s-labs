@@ -7,6 +7,25 @@
   ansible.builtin.command: cloud-init status --wait
   changed_when: false
 
+# Sem isso, o "terraform apply" espera pra sempre o guest agent reportar o
+# IP de volta -- essa VM fica fora do grupo k8s_labs (nao roda k3s-cluster,
+# que e quem instala isso nas outras VMs do lab), entao ninguem instalava
+# (mesmo achado do nfs-ganesha, 2026-11-19, so nao tinha sido replicado
+# pras VMs standalone novas ate 2026-11-24).
+- name: Install the QEMU guest agent
+  ansible.builtin.apt:
+    name: qemu-guest-agent
+    state: present
+    update_cache: true
+  become: true
+
+- name: Ensure the guest agent is enabled and running
+  ansible.builtin.systemd:
+    name: qemu-guest-agent
+    enabled: true
+    state: started
+  become: true
+
 - name: Instala Ansible (o Semaphore so orquestra -- precisa do ansible-playbook no PATH local pra executar os templates)
   ansible.builtin.apt:
     name: ansible

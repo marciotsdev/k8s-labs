@@ -1,4 +1,23 @@
 ---
+# Sem isso, o "terraform apply" espera pra sempre o guest agent reportar o
+# IP de volta -- essa VM fica fora do grupo k8s_labs (nao roda k3s-cluster,
+# que e quem instala isso nas outras VMs do lab), entao ninguem instalava
+# (mesmo achado do nfs-ganesha, 2026-11-19, so nao tinha sido replicado
+# pras VMs standalone novas ate 2026-11-24).
+- name: Install the QEMU guest agent
+  apt:
+    name: qemu-guest-agent
+    state: present
+    update_cache: true
+  become: true
+
+- name: Ensure the guest agent is enabled and running
+  systemd:
+    name: qemu-guest-agent
+    enabled: true
+    state: started
+  become: true
+
 - name: Install docker
   apt:
     name:
