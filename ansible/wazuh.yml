@@ -1,0 +1,7 @@
+---
+# Instala o Wazuh Manager + Indexer + Dashboard (all-in-one) na VM dedicada
+# -- ver terraform/wazuh/ e ansible/roles/wazuh-manager/.
+- hosts: wazuh_manager
+  gather_facts: true
+  roles:
+    - wazuh-manager

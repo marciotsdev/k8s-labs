@@ -1,0 +1,17 @@
+---
+# Instala o Wazuh Agent nos 10 hosts do lab, registrando contra o Manager
+# (192.168.15.80). Roda DEPOIS do ansible/wazuh.yml (o Manager precisa
+# existir primeiro pra aceitar o registro dos agentes).
+#
+# O semaphore-ui (grupo semaphore_ui_standalone, ver hosts-wazuh.ini) segue
+# a mesma ressalva do platform-ops.yml: rodar esta play contra ele SO
+# manualmente, via terminal -- nunca com o Semaphore orquestrando a si
+# mesmo. Rode assim pra cobrir todo mundo numa vez só:
+#   ansible-playbook -i inventory/hosts-all.ini -i inventory/hosts-wazuh.ini \
+#     wazuh-agents.yml --limit all_vms:semaphore_ui_standalone
+- hosts: all_vms:semaphore_ui_standalone
+  gather_facts: true
+  vars:
+    wazuh_manager_ip: "192.168.15.80"
+  roles:
+    - wazuh-agent

@@ -1,0 +1,67 @@
+---
+# Instala Wazuh Manager + Indexer + Dashboard juntos (all-in-one, flag -a do
+# script oficial) -- unico node, dimensionado pra ate 25 agentes (4 vCPU/
+# 8GB RAM/50GB disco, ver terraform/wazuh/terraform.tfvars). O lab tem 10
+# hosts hoje, cabe folgado nessa faixa sem precisar do modo distribuido.
+#
+# "creates" no download+install evita rerodar o instalador (nao idempotente
+# por padrao) -- /var/ossec/bin/wazuh-control so existe depois que o
+# Manager realmente instalou.
+- name: Wait for cloud-init to finish its first-boot run
+  command: cloud-init status --wait
+  become: true
+  changed_when: false
+
+# Sem isso, o "terraform apply" espera pra sempre o guest agent reportar o
+# IP de volta -- essa VM fica fora do grupo k8s_labs (nao roda k3s-cluster,
+# que e quem instala isso nas outras VMs do lab), entao ninguem instalava
+# (mesmo achado do nfs-ganesha, 2026-11-19, so nao tinha sido replicado
+# pras VMs standalone novas ate 2026-11-24).
+- name: Install the QEMU guest agent
+  apt:
+    name: qemu-guest-agent
+    state: present
+    update_cache: true
+  become: true
+
+- name: Ensure the guest agent is enabled and running
+  systemd:
+    name: qemu-guest-agent
+    enabled: true
+    state: started
+  become: true
+
+- name: Download the official Wazuh all-in-one installer
+  get_url:
+    url: "https://packages.wazuh.com/{{ wazuh_version_minor }}/wazuh-install.sh"
+    dest: /root/wazuh-install.sh
+    mode: "0750"
+  become: true
+
+- name: Run the all-in-one installer (Manager + Indexer + Dashboard)
+  command: bash /root/wazuh-install.sh -a
+  args:
+    creates: /var/ossec/bin/wazuh-control
+  become: true
+  register: wazuh_install
+
+# O instalador gera as senhas (admin do Dashboard, usuarios internos do
+# Indexer) num arquivo tar na primeira execucao -- pratica oficial de
+# seguranca e baixar esse arquivo e apagar do servidor, nunca deixar parado
+# ali. So mostra o AVISO aqui, nunca o conteudo (senha nunca aparece em log
+# nem em saida do Ansible).
+- name: Check if the generated credentials file still exists on the server
+  stat:
+    path: /root/wazuh-install-files.tar
+  register: wazuh_creds_file
+  become: true
+
+- name: Aviso -- baixar e remover o arquivo de credenciais geradas
+  debug:
+    msg: >-
+      /root/wazuh-install-files.tar ainda esta no servidor -- baixe com
+      "scp ubuntu@{{ ansible_host }}:/root/wazuh-install-files.tar ." e
+      depois apague do servidor ("ssh ubuntu@{{ ansible_host }} sudo rm
+      /root/wazuh-install-files.tar"). Esse arquivo tem a senha do admin do
+      Dashboard e dos usuarios internos do Indexer -- nao deixar exposto.
+  when: wazuh_creds_file.stat.exists

@@ -1,0 +1,52 @@
+---
+# Instala o Wazuh Agent via repo apt oficial, registrando contra o Manager
+# (WAZUH_MANAGER no ambiente da task de instalacao -- so tem efeito na
+# primeira instalacao/registro, igual o comportamento documentado do
+# instalador oficial). SCA (Security Configuration Assessment) vem
+# habilitado por padrao no agente, sem passo extra -- e o que assume o
+# papel do Lynis quando validado (ver memoria k8s-labs-next-evolution).
+- name: Install apt prerequisites for the Wazuh repo
+  apt:
+    name: [gnupg, apt-transport-https, curl]
+    state: present
+    update_cache: true
+  become: true
+
+- name: Add the Wazuh GPG signing key
+  shell: >
+    curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH |
+    gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import &&
+    chmod 644 /usr/share/keyrings/wazuh.gpg
+  args:
+    creates: /usr/share/keyrings/wazuh.gpg
+  become: true
+
+# "4.x" aqui e literal, nao a versao -- diferente do path do script de
+# instalacao do Manager (packages.wazuh.com/4.14/wazuh-install.sh, esse sim
+# versionado). O repo apt usa um alias fixo que sempre aponta pra ultima
+# release da major 4 -- usar a versao especifica (ex: 4.14) da 403
+# Forbidden/AccessDenied direto do S3 (achado em 2026-11-24, via curl no
+# corpo do erro).
+- name: Add the Wazuh apt repository
+  apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main"
+    filename: wazuh
+    state: present
+  become: true
+
+- name: Install the Wazuh agent, registering against the Manager
+  apt:
+    name: wazuh-agent
+    state: present
+    update_cache: true
+  environment:
+    WAZUH_MANAGER: "{{ wazuh_manager_ip }}"
+  become: true
+
+- name: Ensure the Wazuh agent is enabled and running
+  systemd:
+    name: wazuh-agent
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true
