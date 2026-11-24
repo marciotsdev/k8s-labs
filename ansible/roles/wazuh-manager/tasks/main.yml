@@ -65,3 +65,27 @@
       /root/wazuh-install-files.tar"). Esse arquivo tem a senha do admin do
       Dashboard e dos usuarios internos do Indexer -- nao deixar exposto.
   when: wazuh_creds_file.stat.exists
+
+# Achado real em 2026-11-24: com a VM em 8GB (sizing oficial pra ate 25
+# agentes), o instalador detectou a RAM apertada e reduziu o heap do JVM do
+# Indexer pra so 1GB (o default de referencia, comentado no proprio
+# arquivo, seria 4GB pra uma maquina de 8GB) -- sintoma de uma VM no limite
+# (~95% de memoria em repouso, so cache reclamavel, mas o boot a frio com
+# Manager+Indexer+Dashboard competindo batia no timeout de 3min do systemd
+# e falhava). RAM da VM subida pra 12GB (terraform.tfvars) e o heap fixado
+# aqui em 4GB -- a VM nao reajusta isso sozinha so por ganhar mais RAM,
+# precisa dos dois juntos. Validado com boot a frio completo: Manager +
+# Indexer + Dashboard + 10 agentes subiram limpos.
+# notify nos dois -- o Manager tambem precisa reiniciar depois do Indexer
+# quando o heap muda, senao fica preso apontando pra uma conexao que caiu
+# durante o restart do Indexer (mesmo achado de 2026-11-24).
+- name: Fixa o heap do JVM do Wazuh Indexer (nao reajusta sozinho so com mais RAM)
+  lineinfile:
+    path: /etc/wazuh-indexer/jvm.options
+    regexp: "^-Xm{{ item }}"
+    line: "-Xm{{ item }}{{ wazuh_indexer_heap }}"
+  loop: ["s", "x"]
+  become: true
+  notify:
+    - restart wazuh-indexer
+    - restart wazuh-manager

@@ -1,0 +1,17 @@
+---
+# Ordem importa: o Manager depende do Indexer (fila de eventos via
+# wazuh-db/wazuh-remoted) -- reiniciar na ordem errada derruba o Manager
+# com timeout (achado real em 2026-11-24, ver comentario no tasks/main.yml).
+# Ansible roda handlers na ordem em que estao DEFINIDOS aqui, nao na ordem
+# do "notify:" da task -- por isso o indexer vem primeiro neste arquivo.
+- name: restart wazuh-indexer
+  systemd:
+    name: wazuh-indexer
+    state: restarted
+  become: true
+
+- name: restart wazuh-manager
+  systemd:
+    name: wazuh-manager
+    state: restarted
+  become: true

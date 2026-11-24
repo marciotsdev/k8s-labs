@@ -13,12 +13,20 @@ ssh_public_key_path = "~/.ssh/homelab_ed25519.pub"
 # + floci-az) -- caberia na faixa menor, mas decisao explicita (24/11) de
 # usar a faixa 26-50 de proposito, com folga pro ambiente crescer sem
 # precisar redimensionar a VM depois.
+#
+# Memoria subida de 8GB pra 12GB em 2026-11-24 (mesmo dia): em repouso, com
+# so 10 agentes e zero carga real, a VM ja estava em ~95% de uso (a maior
+# parte era buff/cache reclamavel, nao perigo real de OOM -- mas o
+# instalador do Wazuh detectou a RAM apertada e reduziu o heap do JVM do
+# Indexer pra so 1GB (default de referencia seria 4GB pra uma maquina de
+# 8GB) -- sintoma real do aperto. RAM subida junto com o heap (ver
+# ansible/roles/wazuh-manager ou ajuste manual documentado na memoria).
 vms = {
   wazuh = {
     vm_id         = 2031
     ip            = "192.168.15.80/24"
     cores         = 8
-    memory        = 8192
+    memory        = 12288
     disk          = 100
     # data02-thin -- mesmo pool dos utilitarios leves recentes (ministack,
     # floci-az, nfs-ganesha), fora do pve.
