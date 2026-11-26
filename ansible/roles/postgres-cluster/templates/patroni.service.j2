@@ -1,0 +1,16 @@
+[Unit]
+Description=Patroni (gerencia o Postgres deste no -- nao usar systemctl no postgresql diretamente)
+After=network.target etcd.service
+Wants=etcd.service
+
+[Service]
+Type=simple
+User=postgres
+ExecStart=/usr/local/bin/patroni /etc/patroni/patroni.yml
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=process
+TimeoutSec=30
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

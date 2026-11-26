@@ -1,0 +1,6 @@
+---
+# Cluster Postgres compartilhado (3 nos, Patroni + etcd + HAProxy) -- ver
+# ansible/roles/postgres-cluster/tasks/main.yml pro detalhe de cada passo.
+- hosts: postgres_cluster
+  roles:
+    - postgres-cluster

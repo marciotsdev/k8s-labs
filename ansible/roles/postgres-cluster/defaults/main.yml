@@ -1,0 +1,15 @@
+# Versao do pacote "postgresql" do apt no Ubuntu 22.04 (jammy) -- suficiente
+# pro Forgejo/Backstage, sem precisar adicionar o repositorio PGDG externo.
+postgres_cluster_pg_version: "14"
+
+# Nome logico do cluster no etcd/Patroni (varios "scopes" poderiam compartilhar
+# o mesmo etcd no futuro, mas hoje so existe este).
+postgres_cluster_scope: postgres-lab
+
+# Portas -- documentadas aqui porque aparecem espalhadas nos templates.
+postgres_cluster_etcd_client_port: 2379
+postgres_cluster_etcd_peer_port: 2380
+postgres_cluster_patroni_rest_port: 8008
+postgres_cluster_pg_port: 5432
+postgres_cluster_haproxy_write_port: 5000
+postgres_cluster_haproxy_read_port: 5001

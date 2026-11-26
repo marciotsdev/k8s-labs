@@ -1,0 +1,37 @@
+# So aplicado no postgres-shared-1 por enquanto (decisao de 2026-11-26: um
+# HAProxy so pra comecar, sem VIP/keepalived ainda -- o HAProxy em si vira
+# um SPOF pontual, aceito por ora porque o objetivo imediato e eliminar o
+# SPOF do PROPRIO POSTGRES, nao resolver toda a cadeia de uma vez).
+#
+# O truque real: o endpoint /primary do Patroni so responde 200 no no que E
+# o lider AGORA -- o httpchk garante que escrita nunca vai pro no errado,
+# mesmo depois de um failover automatico.
+global
+    maxconn 100
+
+defaults
+    log global
+    mode tcp
+    retries 2
+    timeout client 30m
+    timeout connect 4s
+    timeout server 30m
+    timeout check 5s
+
+listen postgres_write
+    bind *:{{ postgres_cluster_haproxy_write_port }}
+    option httpchk GET /primary
+    http-check expect status 200
+    default-server inter 3s fall 3 rise 2 on-marked-down shutdown-sessions
+    server postgres-shared-1 {{ hostvars['postgres-shared-1'].ansible_host }}:{{ postgres_cluster_pg_port }} check port {{ postgres_cluster_patroni_rest_port }}
+    server postgres-shared-2 {{ hostvars['postgres-shared-2'].ansible_host }}:{{ postgres_cluster_pg_port }} check port {{ postgres_cluster_patroni_rest_port }}
+    server postgres-shared-3 {{ hostvars['postgres-shared-3'].ansible_host }}:{{ postgres_cluster_pg_port }} check port {{ postgres_cluster_patroni_rest_port }}
+
+listen postgres_read
+    bind *:{{ postgres_cluster_haproxy_read_port }}
+    option httpchk GET /replica
+    http-check expect status 200
+    default-server inter 3s fall 3 rise 2 on-marked-down shutdown-sessions
+    server postgres-shared-1 {{ hostvars['postgres-shared-1'].ansible_host }}:{{ postgres_cluster_pg_port }} check port {{ postgres_cluster_patroni_rest_port }}
+    server postgres-shared-2 {{ hostvars['postgres-shared-2'].ansible_host }}:{{ postgres_cluster_pg_port }} check port {{ postgres_cluster_patroni_rest_port }}
+    server postgres-shared-3 {{ hostvars['postgres-shared-3'].ansible_host }}:{{ postgres_cluster_pg_port }} check port {{ postgres_cluster_patroni_rest_port }}

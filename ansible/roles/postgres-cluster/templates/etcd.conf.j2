@@ -1,0 +1,15 @@
+# Pacote "etcd" do apt (Ubuntu 22.04) le essas variaveis via
+# /etc/default/etcd (systemd unit faz EnvironmentFile=/etc/default/etcd).
+# Os 3 nos precisam subir vendo uns aos outros JA no boot inicial
+# (ETCD_INITIAL_CLUSTER_STATE=new) -- etcd so forma quorum se enxergar pelo
+# menos 2 de 3 logo de cara; depois de formado, trocar pra "existing" se
+# algum no precisar ser reinstalado sem derrubar o cluster inteiro.
+ETCD_NAME="postgres-shared-{{ pg_node_index }}"
+ETCD_DATA_DIR="/var/lib/etcd/default.etcd"
+ETCD_LISTEN_PEER_URLS="http://{{ ansible_host }}:{{ postgres_cluster_etcd_peer_port }}"
+ETCD_LISTEN_CLIENT_URLS="http://{{ ansible_host }}:{{ postgres_cluster_etcd_client_port }},http://127.0.0.1:{{ postgres_cluster_etcd_client_port }}"
+ETCD_INITIAL_ADVERTISE_PEER_URLS="http://{{ ansible_host }}:{{ postgres_cluster_etcd_peer_port }}"
+ETCD_ADVERTISE_CLIENT_URLS="http://{{ ansible_host }}:{{ postgres_cluster_etcd_client_port }}"
+ETCD_INITIAL_CLUSTER="postgres-shared-1=http://{{ hostvars['postgres-shared-1'].ansible_host }}:{{ postgres_cluster_etcd_peer_port }},postgres-shared-2=http://{{ hostvars['postgres-shared-2'].ansible_host }}:{{ postgres_cluster_etcd_peer_port }},postgres-shared-3=http://{{ hostvars['postgres-shared-3'].ansible_host }}:{{ postgres_cluster_etcd_peer_port }}"
+ETCD_INITIAL_CLUSTER_STATE="new"
+ETCD_INITIAL_CLUSTER_TOKEN="{{ postgres_cluster_scope }}-etcd"

@@ -1,0 +1,197 @@
+---
+# Cluster Postgres compartilhado pro lab (Forgejo primeiro, Backstage depois)
+# -- 3 nos pares, cada um Postgres + Patroni + etcd. Nasceu da constatacao de
+# que o Forgejo e "single-node, sem HA" (SQLite, replicaCount fixo em 1).
+# Decisao de 2026-11-26: discos locais em cada VM (data02-thin), nunca um
+# datastore compartilhado entre elas -- o Patroni replica via WAL streaming
+# (shared-nothing, 3 copias completas), isso EXIGE disco independente por
+# no. Datastore compartilhado seria o modelo antigo (storage + failover),
+# incompativel com o Patroni, e nao traria ganho real de qualquer forma --
+# este lab tem 1 host Proxmox fisico so, entao nenhum datastore protege
+# contra falha do host em si.
+
+- name: Wait for cloud-init to finish its first-boot run
+  command: cloud-init status --wait
+  become: true
+  changed_when: false
+
+- name: Install the QEMU guest agent
+  apt:
+    name: qemu-guest-agent
+    state: present
+    update_cache: true
+  become: true
+
+- name: Ensure the guest agent is enabled and running
+  systemd:
+    name: qemu-guest-agent
+    enabled: true
+    state: started
+  become: true
+
+- name: Read the shared cluster secrets
+  set_fact:
+    postgres_cluster_superuser_password: "{{ lookup('file', secrets_dir + '/postgres_superuser_password') }}"
+    postgres_cluster_replicator_password: "{{ lookup('file', secrets_dir + '/postgres_replicator_password') }}"
+  no_log: true
+
+# --- etcd (DCS -- quem decide qual no e o lider) -----------------------
+
+- name: Install etcd
+  apt:
+    name: etcd
+    state: present
+    update_cache: true
+  become: true
+
+- name: Configure etcd (initial-cluster com os 3 nos)
+  template:
+    src: etcd.conf.j2
+    dest: /etc/default/etcd
+    mode: "0644"
+  become: true
+  notify: restart etcd
+
+- name: Ensure etcd is enabled and running
+  systemd:
+    name: etcd
+    enabled: true
+    state: started
+  become: true
+
+# --- PostgreSQL (so o binario -- quem gerencia start/stop/initdb e o
+# Patroni, nunca o systemd nativo do pacote) -----------------------------
+
+- name: Install PostgreSQL and the Python driver Patroni precisa
+  apt:
+    name:
+      - "postgresql-{{ postgres_cluster_pg_version }}"
+      - postgresql-contrib
+      - python3-pip
+      - python3-psycopg2
+    state: present
+    update_cache: true
+  become: true
+
+# O pacote postgresql do Debian/Ubuntu cria e INICIA sozinho um cluster
+# default ("main") via pg_createcluster na instalacao -- se deixar isso
+# rodando, ele disputa a porta 5432 com o Postgres que o Patroni vai
+# inicializar do zero no proprio data_dir dele. Precisa parar e remover
+# esse cluster automatico antes do Patroni subir (achado esperado ao
+# instalar Patroni em cima do pacote distro, documentado no proprio guia
+# oficial do Patroni -- nao e um bug deste playbook).
+# "become_user: postgres" aqui (como estava antes) faz o Ansible tentar um
+# fallback de ACL (`chmod +a`) pra dar acesso ao usuario nao-root nos
+# arquivos temporarios -- essa sintaxe e do BSD/macOS, o Ubuntu nao suporta
+# ("invalid mode: 'A+user:postgres:rx:allow'"). pg_lsclusters le config, nao
+# precisa ser o usuario postgres -- roda como root (become padrao) sem essa
+# complicacao.
+- name: Check if the distro's auto-created default cluster exists
+  command: pg_lsclusters --no-header
+  become: true
+  register: pg_lsclusters_out
+  changed_when: false
+  failed_when: false
+
+- name: Stop and drop the distro's auto-created default cluster
+  command: "pg_dropcluster --stop {{ postgres_cluster_pg_version }} main"
+  become: true
+  when: "'main' in pg_lsclusters_out.stdout"
+
+- name: Mask the generic postgresql systemd service (Patroni owns start/stop from here)
+  systemd:
+    name: postgresql
+    masked: true
+  become: true
+
+# --- Patroni -------------------------------------------------------------
+
+- name: Install Patroni (+ driver etcd3) via pip
+  pip:
+    name:
+      - patroni[etcd3]
+    executable: pip3
+  become: true
+
+- name: Ensure /etc/patroni exists
+  file:
+    path: /etc/patroni
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0750"
+  become: true
+
+- name: Configure Patroni for this node
+  template:
+    src: patroni.yml.j2
+    dest: /etc/patroni/patroni.yml
+    owner: postgres
+    group: postgres
+    mode: "0600"
+  become: true
+  notify: restart patroni
+
+- name: Install the Patroni systemd unit
+  template:
+    src: patroni.service.j2
+    dest: /etc/systemd/system/patroni.service
+    mode: "0644"
+  become: true
+  register: patroni_unit
+
+- name: Reload systemd after installing the Patroni unit
+  systemd:
+    daemon_reload: true
+  become: true
+  when: patroni_unit.changed
+
+- name: Ensure Patroni is enabled and running
+  systemd:
+    name: patroni
+    enabled: true
+    state: started
+  become: true
+
+# so faz sentido validar depois que os 3 nos ja rodaram esta role pelo
+# menos uma vez (precisa do quorum do etcd formado) -- numa primeira
+# aplicacao em paralelo isso pode falhar nos primeiros segundos, retry
+# cobre a corrida de inicializacao normal do cluster nascendo.
+# "status is defined" (como estava antes) e verdadeiro desde a 1a tentativa
+# mesmo quando a conexao falha (o campo existe com valor -1) -- o retry
+# parava no primeiro erro em vez de tentar de novo. Precisa checar o VALOR.
+- name: Wait for the local Patroni REST API to answer
+  uri:
+    url: "http://127.0.0.1:{{ postgres_cluster_patroni_rest_port }}/health"
+    status_code: [200, 503]
+  register: patroni_health
+  until: patroni_health.status in [200, 503]
+  retries: 20
+  delay: 10
+
+# --- HAProxy (so no primeiro no por enquanto -- ver comentario no template) --
+
+- name: Install HAProxy
+  apt:
+    name: haproxy
+    state: present
+    update_cache: true
+  become: true
+  when: pg_node_index == 1
+
+- name: Configure HAProxy in front of the Patroni cluster
+  template:
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg
+    mode: "0644"
+  become: true
+  when: pg_node_index == 1
+  notify: reload haproxy
+
+- name: Ensure HAProxy is enabled and running
+  systemd:
+    name: haproxy
+    enabled: true
+    state: started
+  become: true
+  when: pg_node_index == 1

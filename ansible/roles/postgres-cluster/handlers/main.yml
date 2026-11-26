@@ -1,0 +1,18 @@
+---
+- name: restart etcd
+  systemd:
+    name: etcd
+    state: restarted
+  become: true
+
+- name: restart patroni
+  systemd:
+    name: patroni
+    state: restarted
+  become: true
+
+- name: reload haproxy
+  systemd:
+    name: haproxy
+    state: reloaded
+  become: true
